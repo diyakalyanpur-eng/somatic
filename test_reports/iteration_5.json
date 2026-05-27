@@ -1,0 +1,49 @@
+{
+  "summary": "Phase 5 Assessment page testing complete — all 10 user stories passed. Consumer-first /assess route with always-visible 3D beating heart, accessible QRISK3 questionnaire, AI insights, and save-to-history flow working correctly. Patient context flows and camera scan handoff verified.",
+  "backend_issues": {
+    "critical_bugs": [],
+    "flaky_endpoints": [
+      {
+        "endpoint": "/api/narrative",
+        "issue": "Mistral API returns HTTP 429 (rate limit exceeded)",
+        "impact": "AI insights may fail intermittently due to shared API key quota",
+        "fix_priority": "LOW",
+        "note": "Not a code bug - API works correctly when quota available. Frontend test confirmed successful narrative generation (674 chars). Consider upgrading Mistral plan or implementing better rate limit handling."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "passed_tests": [
+    "US1: /assess page loads with header Assess button, 3D heart canvas (beating-heart-3d), initial HR=72, no JS errors",
+    "US2: HR slider updates from 72 to 120 correctly",
+    "US3: QRISK3 questionnaire - age stepper (52), sex (male), ethnicity (indian), smoking (ex), height (178), weight (82), BMI auto-calc (25.9), SBP (142), Chol/HDL (5.0), conditions (type2Dm, treatedHtn) all working",
+    "US4: Calculate button shows result card with score (20.4%), band (High), advice text, and 6 recommendations with priority tags",
+    "US5: AI insights button generates 674-char Mistral narrative, button text changes to 'Regenerate'",
+    "US6: Save button shows success toast 'Assessment saved to history' and redirects to /history",
+    "US7: History page displays 16 saved assessments with history-scan-card elements",
+    "US8: Onboarding flow - step 1 (welcome) → step 2 (consent checkbox) → step 3 → 'Start my heart-risk check' button routes to /assess",
+    "US9: Patient detail page (PT-1ABFBE) → 'Run risk check' button routes to /patients/{id}/assess with patient code chip visible",
+    "US10: /assess 'Or run a 30-second camera scan' button routes to /aisteth.html without uncaught JS errors",
+    "Backend: GET /api/ returns version 1.1.0",
+    "Backend: GET /api/stats returns totalScans, totalAssessments, totalPatients",
+    "Backend: GET /api/patients returns patient list",
+    "Backend: POST /api/save-assessment successfully saves assessment with generated ID"
+  ],
+  "test_report_links": [
+    "/app/tests/backend_test.py"
+  ],
+  "success_percentage": {
+    "backend": "80% (4/5 passed, 1 rate-limited)",
+    "frontend": "100% (10/10 user stories passed)"
+  },
+  "updated_files": [
+    "/app/tests/backend_test.py"
+  ],
+  "action_item_for_main_agent": "",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_test_itself": false
+}

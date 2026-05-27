@@ -1,0 +1,82 @@
+{
+  "summary": "Phase 7 Health Insights testing complete. All backend endpoints (19/19) and frontend features working correctly. Risk model routing (WHO/ISH for India, SCORE2 for Europe, QRISK3 for UK) functioning as specified. Mistral integration generating structured analysis with Louise-Hay-inspired affirmations including beliefPattern and rationale. Opt-in flow, profile form, and report display all working. Existing Somatic UX unchanged and functional.",
+  
+  "backend_issues": {
+    "critical_bugs": [],
+    "flaky_endpoints": []
+  },
+  
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  
+  "passed_tests": [
+    "Backend: GET /api/health/models - returns 3 models (qrisk3, score2, who_ish)",
+    "Backend: POST /api/health/risk - India region selects WHO/ISH primary + QRISK3 secondary",
+    "Backend: POST /api/health/risk - Europe region selects SCORE2 primary + QRISK3 secondary",
+    "Backend: POST /api/health/risk - UK region selects QRISK3 primary",
+    "Backend: POST /api/health/risk - response includes inputsUsed, missingInputs, limitations, selectionRationale, score, band",
+    "Backend: POST /api/health/analyze - returns structured JSON with summary, tests[3], lifestyle[3], affirmations[2], disclaimer",
+    "Backend: POST /api/health/analyze - affirmations contain text, beliefPattern, rationale",
+    "Backend: POST /api/health/analyze - caching works (second identical call returns cached:true)",
+    "Backend: POST /api/health/analyze - force=true bypasses cache",
+    "Backend: GET /api/health/reports - returns recent reports with primaryModel, primaryScore, primaryBand",
+    "Backend: POST /api/affirmations/condition - accepts valid conditionKey (stress, hypertension_risk)",
+    "Backend: POST /api/affirmations/condition - rejects unknown keys with 400",
+    "Backend: POST /api/affirmations/condition - returns 3 affirmations with text, beliefPattern, rationale",
+    "Backend Regression: GET /api/ - version check",
+    "Backend Regression: GET /api/affirmations/today",
+    "Backend Regression: POST /api/snapshot",
+    "Backend Regression: POST /api/insight",
+    "Backend Regression: POST /api/journal",
+    "Backend Regression: POST /api/practice",
+    "Backend Regression: GET /api/streak",
+    "Backend Regression: POST /api/notify-me",
+    "Frontend: Bottom nav has 5 tabs (Home, Scan, Insights, History, Profile)",
+    "Frontend: Insights tab activates correctly when on /insights/*",
+    "Frontend: /insights - shows opt-in card when localStorage 'somatic.healthOptedIn' is absent",
+    "Frontend: /insights - after clicking 'Turn on Health Insights' becomes main Insights screen",
+    "Frontend: /insights - profile card and generate report CTA visible after opt-in",
+    "Frontend: /insights/profile - all form fields render (region, ethnicity, age, sex, smoking, BP, BMI, cholesterol, diabetes, family history, treated hypertension, CKD, AF, RA)",
+    "Frontend: /insights/profile - Save persists to localStorage and navigates back",
+    "Frontend: /insights/report - loads and shows primary score card with band-colored border",
+    "Frontend: /insights/report - secondary models comparison chips visible",
+    "Frontend: /insights/report - plain-language summary card visible",
+    "Frontend: /insights/report - tests card with 3 tests visible",
+    "Frontend: /insights/report - lifestyle card with 3 suggestions visible",
+    "Frontend: /insights/report - affirmations card with 2 affirmations visible",
+    "Frontend: /insights/report - Louise-Hay affirmation card shows 'BELIEF LOUISE ASSOCIATED WITH THIS' and 'WHY THIS MAKES SENSE' subheadings",
+    "Frontend: /insights/report - paraphrasing footer 'Inspired by Louise L. Hay's teachings — paraphrased, not quoted.' present",
+    "Frontend: /insights/report - disclaimer visible and mentions 'not a diagnosis'",
+    "Frontend: /insights/report - model limitations visible",
+    "Frontend Regression: Home page accessible and loads",
+    "Frontend Regression: Scan page accessible and loads",
+    "Frontend Regression: History page accessible and loads",
+    "Frontend Regression: Profile page accessible and loads",
+    "Frontend Regression: Navigation between all 5 tabs works correctly"
+  ],
+  
+  "test_report_links": [
+    "/app/tests/backend_test_phase7.py",
+    "/app/.screenshots/insights_optin.png",
+    "/app/.screenshots/health_profile_form.png",
+    "/app/.screenshots/health_report.png"
+  ],
+  
+  "success_percentage": {
+    "backend": "100% (19/19 tests passed)",
+    "frontend": "100% (all features working)",
+    "overall": "100%"
+  },
+  
+  "action_item_for_main_agent": "",
+  
+  "updated_files": [
+    "/app/tests/backend_test_phase7.py"
+  ],
+  
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_test_itself": false
+}

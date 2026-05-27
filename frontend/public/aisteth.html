@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no" />
+<meta name="theme-color" content="#0A0A0F" />
+<title>Somatic · Scan</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23E8445A'%3E%3Cpath d='M12 21s-7-4.35-7-10a4.5 4.5 0 0 1 8-2.83A4.5 4.5 0 0 1 21 11c0 5.65-7 10-7 10z'/%3E%3C/svg%3E" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,500;1,500&display=swap" rel="stylesheet" />
+
+<!-- Three.js via importmap -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #0A0A0F; color: #F0EDE8;
+    font-family: 'Figtree', system-ui, -apple-system, Segoe UI, sans-serif;
+    -webkit-font-smoothing: antialiased; overflow: hidden;
+  }
+  body { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+  .serif { font-family: 'Playfair Display', Georgia, serif; }
+  button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+  .hidden { display: none !important; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+  #app { position: fixed; inset: 0; overflow: hidden; }
+
+  /* Camera feed */
+  #video {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; background: #000;
+    transform: scaleX(-1); /* mirror; rear-camera mode disables this */
+  }
+  #video.no-mirror { transform: none; }
+  #video.dim { filter: brightness(0.45) blur(2px); transition: filter 400ms ease; }
+
+  /* Overlay gradient for legibility */
+  .scrim {
+    position: absolute; inset: 0; pointer-events: none;
+    background:
+      radial-gradient(circle at 50% 35%, rgba(10,10,15,0.0) 0%, rgba(10,10,15,0.0) 35%, rgba(10,10,15,0.55) 65%, rgba(10,10,15,0.9) 100%),
+      linear-gradient(180deg, rgba(10,10,15,0.6) 0%, rgba(10,10,15,0.0) 22%, rgba(10,10,15,0.0) 60%, rgba(10,10,15,0.85) 100%);
+  }
+
+  /* 3D heart canvas overlay (above camera) */
+  #heart-mount {
+    position: absolute; left: 50%; top: 30%;
+    transform: translate(-50%, -50%);
+    width: 230px; height: 230px;
+    pointer-events: none;
+    opacity: 0; transition: opacity 500ms ease;
+  }
+  #heart-mount.visible { opacity: 1; }
+
+  /* Top bar */
+  .topbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 30;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 16px;
+    background: linear-gradient(180deg, rgba(10,10,15,0.85), rgba(10,10,15,0));
+  }
+  .back-link {
+    display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 14px;
+    background: rgba(19,19,26,0.75); border: 1px solid #1F1F2E; border-radius: 999px;
+    color: #F0EDE8; text-decoration: none; font-size: 13px; font-weight: 500;
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    transition: background-color 200ms, border-color 200ms;
+  }
+  .back-link:hover { background: rgba(26,17,24,0.9); border-color: rgba(232,68,90,0.4); }
+  .brand-strip { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; color: #8A8280; text-transform: uppercase; letter-spacing: 0.12em; }
+  .brand-dot { width: 7px; height: 7px; border-radius: 99px; background: #E8445A;
+               box-shadow: 0 0 12px rgba(232,68,90,0.7); animation: pulse-ring 1.6s ease-out infinite; }
+  @keyframes pulse-ring { 0%{box-shadow:0 0 0 0 rgba(232,68,90,.55);} 70%{box-shadow:0 0 0 14px rgba(232,68,90,0);} 100%{box-shadow:0 0 0 0 rgba(232,68,90,0);} }
+
+  /* Status pill */
+  #status-bar {
+    position: fixed; top: 64px; left: 50%; transform: translateX(-50%);
+    z-index: 20; font-size: 12px; color: #F0EDE8; padding: 8px 16px;
+    background: rgba(19,19,26,0.85); border: 1px solid #1F1F2E; border-radius: 999px;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    max-width: 90%; text-align: center;
+  }
+
+  /* Calibration / pre-start overlay */
+  #calibration-overlay {
+    position: fixed; inset: 0; z-index: 40; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; padding: 28px; gap: 22px;
+    background: radial-gradient(circle at 50% 30%, #1A1118 0%, #0A0A0F 70%);
+    transition: opacity 400ms ease;
+  }
+  #calibration-overlay.fade { opacity: 0; pointer-events: none; }
+  .cal-mark {
+    width: 56px; height: 56px; border-radius: 18px;
+    background: linear-gradient(180deg, rgba(232,68,90,0.20), rgba(232,68,90,0.05));
+    border: 1px solid rgba(232,68,90,0.45); display: grid; place-items: center;
+  }
+  .cal-mark svg { width: 28px; height: 28px; color: #E8445A; }
+  .cal-title { font-family: 'Playfair Display', serif; font-size: 26px; font-weight: 500; letter-spacing: -0.01em; line-height: 1.2; text-align: center; }
+  .cal-sub { font-size: 14px; color: #8A8280; text-align: center; max-width: 340px; line-height: 1.55; }
+  .mode-pills { display: flex; gap: 8px; padding: 4px; background: rgba(19,19,26,0.9); border: 1px solid #1F1F2E; border-radius: 999px; }
+  .mode-pill {
+    padding: 9px 18px; border-radius: 999px; font-size: 13px; font-weight: 500; color: #8A8280;
+    transition: background-color 200ms, color 200ms;
+  }
+  .mode-pill.active { background: rgba(232,68,90,0.15); color: #E8445A; }
+
+  .start-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    height: 52px; padding: 0 28px; min-width: 220px;
+    background: #E8445A; color: #0A0A0F; font-weight: 600; font-size: 15px;
+    border-radius: 999px;
+    box-shadow: 0 8px 24px rgba(232,68,90,0.35);
+    transition: background-color 200ms, transform 120ms;
+  }
+  .start-btn:hover { background: #F26478; }
+  .start-btn:active { transform: scale(0.97); }
+  .start-btn[disabled] { opacity: 0.55; cursor: not-allowed; }
+
+  .cal-tip { font-size: 12px; color: #6E6862; text-align: center; max-width: 320px; }
+
+  /* Countdown ring (in-scan) */
+  #countdown-overlay { position: fixed; inset: 0; z-index: 25; display: none; align-items: center; justify-content: center; pointer-events: none; }
+  #countdown-overlay.visible { display: flex; }
+  .ring-wrap { position: relative; width: 280px; height: 280px; }
+  .ring-svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .ring-track { stroke: rgba(255,255,255,0.08); stroke-width: 3; fill: none; }
+  .ring-fg {
+    stroke: #E8445A; stroke-width: 3; fill: none; stroke-linecap: round;
+    stroke-dasharray: 879.6; stroke-dashoffset: 879.6;
+    transition: stroke-dashoffset 200ms linear;
+    filter: drop-shadow(0 0 8px rgba(232,68,90,0.5));
+  }
+  .ring-inner {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 6px; text-align: center;
+  }
+  .ring-num { font-family: 'Playfair Display', serif; font-size: 64px; font-weight: 500; line-height: 1; }
+  .ring-label { font-size: 11px; color: #8A8280; text-transform: uppercase; letter-spacing: 0.15em; }
+
+  /* HUD (bottom card) */
+  #hud {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+    z-index: 20; display: none; flex-direction: column; gap: 12px;
+    width: min(92vw, 420px);
+    padding: 18px 18px 16px;
+    background: rgba(19,19,26,0.92); border: 1px solid #1F1F2E; border-radius: 24px;
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  }
+  #hud.visible { display: flex; }
+  .hud-row { display: flex; align-items: stretch; justify-content: space-between; gap: 10px; }
+  .hud-cell { flex: 1; padding: 8px 12px; background: #0F0F16; border: 1px solid #1F1F2E; border-radius: 14px; }
+  .hud-cell .lbl { font-size: 9px; color: #8A8280; text-transform: uppercase; letter-spacing: 0.14em; }
+  .hud-cell .val { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 500; color: #F0EDE8; line-height: 1.1; margin-top: 2px; }
+  .hud-cell .val .unit { font-family: 'Figtree', sans-serif; font-size: 11px; color: #8A8280; margin-left: 4px; font-weight: 400; }
+  .hud-cell .val.accent { color: #E8445A; }
+  .hud-cell .val.gold { color: #F5C87A; }
+  .quality-bar { display: flex; align-items: center; gap: 8px; font-size: 11px; color: #8A8280; }
+  .quality-dot { width: 8px; height: 8px; border-radius: 99px; background: #6E6862; transition: background-color 200ms; }
+  .quality-dot.strong { background: #7DD3A0; }
+  .quality-dot.medium { background: #F5C87A; }
+  .quality-dot.weak { background: #E8445A; }
+
+  /* Finish CTA */
+  .hud-cta {
+    margin-top: 4px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    height: 46px; border-radius: 999px;
+    background: #E8445A; color: #0A0A0F; font-weight: 600; font-size: 14px;
+    transition: background-color 200ms, transform 120ms; opacity: 0.55; pointer-events: none;
+  }
+  .hud-cta.ready { opacity: 1; pointer-events: auto; box-shadow: 0 6px 20px rgba(232,68,90,0.35); }
+  .hud-cta:hover { background: #F26478; }
+
+  /* Disclaimer footer (small) */
+  .disclaimer {
+    position: fixed; left: 50%; bottom: 4px; transform: translateX(-50%);
+    z-index: 15; font-size: 10px; color: #6E6862;
+  }
+
+  /* Mode tag (during scan) */
+  .mode-tag {
+    position: fixed; top: 110px; left: 50%; transform: translateX(-50%);
+    z-index: 20;
+    font-size: 10px; color: #8A8280; text-transform: uppercase; letter-spacing: 0.18em;
+    padding: 4px 12px; background: rgba(19,19,26,0.7); border: 1px solid #1F1F2E; border-radius: 999px;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <video id="video" autoplay playsinline muted></video>
+  <div class="scrim"></div>
+
+  <!-- 3D heart canvas mount -->
+  <div id="heart-mount"></div>
+
+  <!-- Top bar (always visible) -->
+  <div class="topbar">
+    <a href="/" class="back-link" id="back-link" data-testid="scan-back">← Back</a>
+    <div class="brand-strip">
+      <span class="brand-dot"></span>
+      <span>Somatic</span>
+    </div>
+  </div>
+
+  <!-- Pre-scan calibration overlay -->
+  <div id="calibration-overlay" data-testid="scan-calibration">
+    <div class="cal-mark">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7-4.35-7-10a4.5 4.5 0 0 1 8-2.83A4.5 4.5 0 0 1 21 11c0 5.65-7 10-7 10z"/></svg>
+    </div>
+    <div>
+      <div class="cal-title" id="cal-title">Listening to your heart</div>
+      <div class="cal-sub" id="cal-sub">Hold still. Keep your face gently in the frame. This is a wellness signal, not a diagnosis.</div>
+    </div>
+    <div class="mode-pills" id="mode-pills" role="tablist" aria-label="Scan mode">
+      <button class="mode-pill active" data-mode="face" id="mode-face" role="tab" data-testid="scan-mode-face">Face</button>
+      <button class="mode-pill" data-mode="finger" id="mode-finger" role="tab" data-testid="scan-mode-finger">Finger</button>
+    </div>
+    <button id="start-btn" class="start-btn" data-testid="scan-start-btn" disabled>
+      <span id="start-btn-label">Preparing camera…</span>
+    </button>
+    <div class="cal-tip" id="cal-tip">About 30 seconds. The heart will glow with your pulse.</div>
+  </div>
+
+  <!-- Status pill (during scan) -->
+  <div id="status-bar" class="hidden">Measuring…</div>
+  <div id="mode-tag" class="mode-tag hidden">Face · rPPG</div>
+
+  <!-- Countdown ring (during scan) -->
+  <div id="countdown-overlay">
+    <div class="ring-wrap">
+      <svg class="ring-svg" viewBox="0 0 300 300">
+        <circle class="ring-track" cx="150" cy="150" r="140" />
+        <circle id="ring-fg" class="ring-fg" cx="150" cy="150" r="140" />
+      </svg>
+      <div class="ring-inner">
+        <div class="ring-num" id="ring-num">30</div>
+        <div class="ring-label">seconds</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom HUD -->
+  <div id="hud" data-testid="scan-hud">
+    <div class="hud-row">
+      <div class="hud-cell">
+        <div class="lbl">Heart rate</div>
+        <div class="val accent" data-testid="hud-bpm"><span id="hr-value">—</span><span class="unit">bpm</span></div>
+      </div>
+      <div class="hud-cell">
+        <div class="lbl">Variability</div>
+        <div class="val gold" data-testid="hud-hrv"><span id="hrv-value">—</span><span class="unit">ms</span></div>
+      </div>
+      <div class="hud-cell">
+        <div class="lbl">Breath</div>
+        <div class="val" data-testid="hud-brpm"><span id="br-value">—</span><span class="unit">/min</span></div>
+      </div>
+    </div>
+    <div class="quality-bar">
+      <span class="quality-dot" id="quality-dot"></span>
+      <span id="quality-label">Listening…</span>
+    </div>
+    <button id="finish-btn" class="hud-cta" data-testid="scan-finish-btn">Save reading</button>
+  </div>
+
+  <div class="disclaimer">Wellness signal · not a medical diagnosis</div>
+</div>
+
+<script type="module" src="/aisteth/main.js"></script>
+</body>
+</html>

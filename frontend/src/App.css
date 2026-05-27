@@ -1,0 +1,29 @@
+.App {
+  min-height: 100vh;
+  background:
+    radial-gradient(1100px circle at 50% -10%, rgba(232, 68, 90, 0.10), rgba(10, 10, 15, 0) 55%),
+    radial-gradient(700px circle at 90% 0%, rgba(245, 200, 122, 0.05), rgba(10, 10, 15, 0) 52%),
+    #0A0A0F;
+}
+.app-page { min-height: calc(100vh - 64px); padding-bottom: 80px; }
+
+.gradient-text {
+  background: linear-gradient(90deg, #F0EDE8 0%, #E8445A 60%, #F5C87A 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+
+.heart-pulse-dot {
+  width: 9px; height: 9px; border-radius: 999px;
+  background: #E8445A;
+  box-shadow: 0 0 0 0 rgba(232, 68, 90, 0.7);
+  animation: heart-ring 1.1s cubic-bezier(0.66, 0, 0, 1) infinite;
+}
+@keyframes heart-ring {
+  0%   { box-shadow: 0 0 0 0   rgba(232, 68, 90, 0.55); }
+  70%  { box-shadow: 0 0 0 12px rgba(232, 68, 90, 0);   }
+  100% { box-shadow: 0 0 0 0   rgba(232, 68, 90, 0);   }
+}
+
+.scan-cta-shadow {
+  box-shadow: 0 14px 36px rgba(232, 68, 90, 0.28);
+}

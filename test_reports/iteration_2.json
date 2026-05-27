@@ -1,0 +1,45 @@
+{
+  "summary": "Completed comprehensive frontend testing of AiSteth React app (onboarding flow + history dashboard) and standalone vanilla-JS scan page entry point. All 8 user stories validated successfully.",
+  "backend_issues": {},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "passed_tests": [
+    "US1: Onboarding step 1 (Welcome) - All required data-testids present (app-header-brand-link, app-header-scan-button, app-header-history-button, onboarding-step-indicator, onboarding-hero-title, onboarding-welcome-continue-button)",
+    "US2: Onboarding step 2 (Consent) - Consent checkbox, Next/Back buttons present. Next button correctly disabled until consent checkbox is checked, then becomes enabled",
+    "US3: Onboarding step 3 (Ready to scan) - Start scan button present, clicking navigates to /aisteth.html",
+    "US4: History page - All stat tiles present (history-stats-total-scans, history-stats-latest-hr, history-stats-latest-spo2, history-stats-latest-rr), new scan button present",
+    "US5: History with seeded data - Successfully seeded 2 assessment+snapshot records via backend API. Scan cards render correctly with vitals. Modal opens with all tabs (Overview, QRISK3, Narrative). Close button works",
+    "US6: /aisteth.html static page - Loads without page-level JS errors. Key elements present: aisteth-start-btn, aisteth-calc-btn, brand text 'AiSteth', scan-page-back-to-history-button. Note: aisteth-risk-btn is hidden by default (correct behavior - only shown after vitals are locked)",
+    "US7: Catch-all route - Navigating to /some-bad-path correctly renders onboarding page",
+    "US8: Responsive mobile (390x844) - All onboarding elements visible and clickable on mobile viewport"
+  ],
+  "test_report_links": [
+    "/root/.emergent/automation_output/20260515_151922/console_20260515_151922.log",
+    "/root/.emergent/automation_output/20260515_152105/console_20260515_152105.log",
+    "/root/.emergent/automation_output/20260515_152141/console_20260515_152141.log",
+    ".screenshots/us1-onboarding-step1.png",
+    ".screenshots/us2-consent-disabled.png",
+    ".screenshots/us2-consent-enabled.png",
+    ".screenshots/us3-ready-to-scan.png",
+    ".screenshots/us6-aisteth-page.png",
+    ".screenshots/us4-history-empty.png",
+    ".screenshots/us5-history-with-data.png",
+    ".screenshots/us5-modal-overview.png",
+    ".screenshots/us5-modal-qrisk.png",
+    ".screenshots/us5-modal-narrative.png",
+    ".screenshots/us7-catch-all-route.png",
+    ".screenshots/us8-mobile-onboarding.png",
+    ".screenshots/us8-mobile-consent.png"
+  ],
+  "action_item_for_main_agent": "",
+  "updated_files": [],
+  "success_percentage": {
+    "frontend": "100%",
+    "backend": "100% (from iteration_1)"
+  },
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_test_itself": false
+}

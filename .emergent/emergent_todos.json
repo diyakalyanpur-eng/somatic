@@ -1,0 +1,18 @@
+[
+  {
+    "content": "7G-1: Backend POST /api/health/explain — contextual drill-down (test/lifestyle/affirmation) with risk + profile context",
+    "status": "in_progress"
+  },
+  {
+    "content": "7G-2: Frontend — add 'Tell me more' buttons on Health Report cards opening a Sheet with the Mistral drill-down",
+    "status": "pending"
+  },
+  {
+    "content": "7G-3: Frontend Reflect — add 'Focus' picker section calling /api/affirmations/condition; render 3 affirmations with belief + rationale",
+    "status": "pending"
+  },
+  {
+    "content": "Test backend (explain endpoint) + frontend (drill-down sheet + Reflect focus picker)",
+    "status": "pending"
+  }
+]
