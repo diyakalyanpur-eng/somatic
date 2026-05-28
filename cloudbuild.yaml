@@ -5,17 +5,17 @@ steps:
       - build
       - --no-cache
       - -t
-      - gcr.io/$PROJECT_ID/aisteth:$COMMIT_SHA
+      - europe-west1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/somatic:$COMMIT_SHA
       - -t
-      - gcr.io/$PROJECT_ID/aisteth:latest
+      - europe-west1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/somatic:latest
       - .
 
-  # 2. Push to Container Registry
+  # 2. Push to Artifact Registry
   - name: "gcr.io/cloud-builders/docker"
     args:
       - push
       - --all-tags
-      - gcr.io/$PROJECT_ID/aisteth
+      - europe-west1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/somatic
 
   # 3. Deploy to Cloud Run
   - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
@@ -23,9 +23,9 @@ steps:
     args:
       - run
       - deploy
-      - aisteth
-      - --image=gcr.io/$PROJECT_ID/aisteth:$COMMIT_SHA
-      - --region=us-central1
+      - somatic
+      - --image=europe-west1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/somatic:$COMMIT_SHA
+      - --region=europe-west1
       - --platform=managed
       - --allow-unauthenticated
       - --memory=512Mi
@@ -33,14 +33,12 @@ steps:
       - --min-instances=0
       - --max-instances=10
       - --timeout=60
-      # Non-secret env vars set inline
       - --set-env-vars=USE_FIRESTORE=true,GOOGLE_CLOUD_PROJECT=$PROJECT_ID,FIRESTORE_DATABASE=aistethf3,CORS_ORIGINS=*
-      # Secrets pulled from Secret Manager at runtime (create these first — see README)
       - --set-secrets=MISTRAL_KEY=aisteth-mistral-key:latest,API_KEY=aisteth-api-key:latest
 
 images:
-  - gcr.io/$PROJECT_ID/aisteth:$COMMIT_SHA
-  - gcr.io/$PROJECT_ID/aisteth:latest
+  - europe-west1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/somatic:$COMMIT_SHA
+  - europe-west1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/somatic:latest
 
 options:
   logging: CLOUD_LOGGING_ONLY
