@@ -77,7 +77,7 @@ export default function InstallPrompt() {
               <p className="font-semibold text-[#F0EDE8] text-sm">Add Somatic to your home screen</p>
               <p className="text-[11px] text-[#8A8280] mt-0.5">
                 {showIos
-                  ? "Tap the share icon below, then "Add to Home Screen""
+                  ? 'Tap the share icon below, then "Add to Home Screen"'
                   : "Install for instant access — no App Store needed"}
               </p>
             </div>
