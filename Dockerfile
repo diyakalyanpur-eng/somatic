@@ -7,7 +7,7 @@ WORKDIR /build
 
 # Install deps first (layer-cached unless package.json changes)
 COPY frontend/package*.json ./
-RUN npm ci --prefer-offline --legacy-peer-deps
+RUN npm install --prefer-offline --legacy-peer-deps
 
 # Copy source and build
 COPY frontend/ ./
