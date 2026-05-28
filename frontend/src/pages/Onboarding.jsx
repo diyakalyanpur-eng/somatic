@@ -40,7 +40,7 @@ export default function Onboarding() {
   if (step < SLIDES.length) {
     const s = SLIDES[step];
     return (
-      <div className="relative min-h-[100vh] flex flex-col" data-testid="onboarding">
+      <div className="relative flex flex-col" style={{ minHeight: '100dvh' }} data-testid="onboarding">
         <div className="absolute inset-0 bg-top-band pointer-events-none" />
         <div className="relative flex-1 flex flex-col items-center justify-center px-6 text-center">
           <AnimatePresence mode="wait">

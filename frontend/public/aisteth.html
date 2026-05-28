@@ -29,7 +29,17 @@
     font-family: 'Figtree', system-ui, -apple-system, Segoe UI, sans-serif;
     -webkit-font-smoothing: antialiased; overflow: hidden;
   }
-  body { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+  body {
+    /* Let the fixed #app handle all safe-area padding instead */
+    overflow: hidden;
+    width: 100%; max-width: 100%;
+  }
+  #app {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
   .serif { font-family: 'Playfair Display', Georgia, serif; }
   button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
   .hidden { display: none !important; }
@@ -64,11 +74,11 @@
   }
   #heart-mount.visible { opacity: 1; }
 
-  /* Top bar */
+  /* Top bar — pad-top for notch/Dynamic Island */
   .topbar {
     position: fixed; top: 0; left: 0; right: 0; z-index: 30;
     display: flex; justify-content: space-between; align-items: center;
-    padding: 14px 16px;
+    padding: calc(14px + env(safe-area-inset-top)) 16px 14px;
     background: linear-gradient(180deg, rgba(10,10,15,0.85), rgba(10,10,15,0));
   }
   .back-link {
@@ -84,9 +94,9 @@
                box-shadow: 0 0 12px rgba(232,68,90,0.7); animation: pulse-ring 1.6s ease-out infinite; }
   @keyframes pulse-ring { 0%{box-shadow:0 0 0 0 rgba(232,68,90,.55);} 70%{box-shadow:0 0 0 14px rgba(232,68,90,0);} 100%{box-shadow:0 0 0 0 rgba(232,68,90,0);} }
 
-  /* Status pill */
+  /* Status pill — offset below topbar which already includes safe-area-inset-top */
   #status-bar {
-    position: fixed; top: 64px; left: 50%; transform: translateX(-50%);
+    position: fixed; top: calc(64px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
     z-index: 20; font-size: 12px; color: #F0EDE8; padding: 8px 16px;
     background: rgba(19,19,26,0.85); border: 1px solid #1F1F2E; border-radius: 999px;
     backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
@@ -190,7 +200,7 @@
 
   /* Mode tag (during scan) */
   .mode-tag {
-    position: fixed; top: 110px; left: 50%; transform: translateX(-50%);
+    position: fixed; top: calc(110px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
     z-index: 20;
     font-size: 10px; color: #8A8280; text-transform: uppercase; letter-spacing: 0.18em;
     padding: 4px 12px; background: rgba(19,19,26,0.7); border: 1px solid #1F1F2E; border-radius: 999px;
