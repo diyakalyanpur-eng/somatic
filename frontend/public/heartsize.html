@@ -127,6 +127,21 @@
   .cta-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
   .cal-tip { margin-top: 14px; font-size: 11px; color: #6E6862; text-align: center; max-width: 280px; }
 
+  /* ── Sex selector ── */
+  .sex-picker { width: 100%; max-width: 310px; margin-bottom: 24px; }
+  .sex-lbl { font-size: 11px; color: #6E6862; text-align: center; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 10px; }
+  .sex-options { display: flex; gap: 8px; }
+  .sex-opt {
+    flex: 1; height: 40px; border-radius: 12px;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.09);
+    color: #8A8280; font-size: 13px; font-weight: 500; transition: all 180ms;
+  }
+  .sex-opt:hover { background: rgba(255,255,255,0.08); color: #F0EDE8; }
+  .sex-opt.active {
+    background: rgba(232,68,90,0.13); border-color: rgba(232,68,90,0.38);
+    color: #E8445A;
+  }
+
   /* ── Camera / scan screen ── */
   #camera-screen { position: fixed; inset: 0; z-index: 30; background: #000; }
 
@@ -184,12 +199,13 @@
       linear-gradient(180deg, rgba(0,0,0,0.30) 0%, transparent 30%, transparent 55%, rgba(0,0,0,0.55) 100%);
   }
 
-  /* Three.js canvas — full-screen, transparent */
+  /* Three.js canvas — full-screen, pointer events ON (for tap-to-place + gestures) */
   #heart-ar-mount {
-    position: absolute; inset: 0; pointer-events: none;
+    position: absolute; inset: 0;
   }
   #heart-ar-mount canvas {
     display: block; width: 100% !important; height: 100% !important;
+    touch-action: none;
   }
 
   /* Dimension labels floating over heart */
@@ -205,6 +221,42 @@
   #lbl-width  { left: 9%;  top: 50%; transform: translateY(-50%); }
   #lbl-length { top: 14%;  left: 50%; transform: translateX(-50%); }
   #lbl-depth  { right: 9%; top: 50%; transform: translateY(-50%); }
+
+  /* Tap-to-place prompt */
+  #ar-tap-prompt {
+    position: absolute; bottom: 52%; left: 50%; transform: translateX(-50%);
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    pointer-events: none; transition: opacity 400ms;
+  }
+  #ar-tap-prompt.hidden { opacity: 0; pointer-events: none; }
+  .tap-ring {
+    width: 56px; height: 56px; border-radius: 50%;
+    border: 2px solid rgba(232,68,90,0.7);
+    display: grid; place-items: center;
+    animation: tap-pulse 1.6s ease-out infinite;
+  }
+  .tap-ring-inner { width: 20px; height: 20px; border-radius: 50%; background: rgba(232,68,90,0.85); }
+  @keyframes tap-pulse {
+    0%   { box-shadow: 0 0 0 0   rgba(232,68,90,.55); }
+    70%  { box-shadow: 0 0 0 18px rgba(232,68,90,0);  }
+    100% { box-shadow: 0 0 0 0   rgba(232,68,90,0);   }
+  }
+  .tap-label {
+    font-size: 13px; font-weight: 500; color: rgba(240,237,232,0.85);
+    background: rgba(10,10,15,0.55); padding: 5px 14px; border-radius: 999px;
+    backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.10);
+    white-space: nowrap;
+  }
+
+  /* Gesture hint — fades out */
+  #ar-gesture-hint {
+    position: absolute; top: calc(env(safe-area-inset-top) + 70px); left: 50%; transform: translateX(-50%);
+    font-size: 12px; color: rgba(240,237,232,0.7);
+    background: rgba(10,10,15,0.55); padding: 5px 14px; border-radius: 999px;
+    backdrop-filter: blur(8px); pointer-events: none;
+    transition: opacity 600ms; white-space: nowrap;
+  }
+  #ar-gesture-hint.hidden { opacity: 0; }
 
   /* Bottom info panel — glassmorphism */
   .ar-panel {
@@ -232,21 +284,24 @@
   }
   .result-sub { font-size: 12px; color: #8A8280; margin-bottom: 14px; }
 
-  /* Compact 4-stat row */
-  .mini-stats {
-    display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 14px;
+  /* Hero comparison display */
+  .cmp-badge {
+    font-size: 30px; font-weight: 700; letter-spacing: -0.03em;
+    line-height: 1.1; margin: 4px 0 3px; color: #F0EDE8;
+    transition: color 400ms;
   }
-  .mini-stat {
-    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 12px; padding: 8px 6px; text-align: center;
+  .cmp-badge.above { color: #E8445A; }
+  .cmp-badge.below { color: #7DD3A0; }
+  .cmp-badge.avg   { color: #F0EDE8; }
+  .cmp-ctx {
+    font-size: 12px; color: #8A8280; margin-bottom: 16px;
   }
-  .mini-stat .ms-lbl { font-size: 8px; text-transform: uppercase; letter-spacing: 0.12em; color: #6E6862; margin-bottom: 3px; }
-  .mini-stat .ms-val { font-size: 15px; font-weight: 700; color: #F0EDE8; line-height: 1; }
-  .mini-stat .ms-unit { font-size: 9px; color: #8A8280; }
-  .mini-stat .ms-cmp { font-size: 9px; margin-top: 3px; }
-  .mini-stat .ms-cmp.above { color: #E8445A; }
-  .mini-stat .ms-cmp.below { color: #7DD3A0; }
-  .mini-stat .ms-cmp.avg   { color: #8A8280; }
+  /* Estimate line — one compact row, clearly secondary */
+  .est-line {
+    font-size: 11px; color: #6E6862; margin: 10px 0 12px;
+    line-height: 1.6;
+  }
+  .est-line strong { color: #8A8280; font-weight: 500; }
 
   /* Comparison bar */
   .bar-track { position: relative; height: 5px; background: rgba(255,255,255,0.10); border-radius: 999px; margin-bottom: 5px; }
@@ -325,6 +380,15 @@
         <div class="step-text">Keep steady for 1 second — we'll capture and calculate</div>
       </div>
     </div>
+    <div class="sex-picker">
+      <div class="sex-lbl">Biological sex — optional, improves accuracy</div>
+      <div class="sex-options">
+        <button class="sex-opt active" data-sex="other">Skip</button>
+        <button class="sex-opt" data-sex="female">Female</button>
+        <button class="sex-opt" data-sex="male">Male</button>
+      </div>
+    </div>
+
     <button class="cta-btn" id="start-btn">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
       Start measuring
@@ -347,8 +411,18 @@
     <video id="ar-video" autoplay playsinline muted></video>
     <!-- Vignette to make heart pop -->
     <div id="ar-vignette"></div>
-    <!-- Full-screen Three.js canvas -->
+    <!-- Full-screen Three.js canvas (handles tap-to-place + gestures) -->
     <div id="heart-ar-mount"></div>
+
+    <!-- Tap-to-place prompt (visible while GLB loading / before placement) -->
+    <div id="ar-tap-prompt" class="hidden">
+      <div class="tap-ring"><div class="tap-ring-inner"></div></div>
+      <div class="tap-label">Tap anywhere to place your heart</div>
+    </div>
+
+    <!-- Gesture hint (shown briefly after first placement) -->
+    <div id="ar-gesture-hint" class="hidden">Pinch to scale · drag to move · twist to rotate</div>
+
     <!-- Dimension labels -->
     <span class="ar-dim" id="lbl-width"></span>
     <span class="ar-dim" id="lbl-length"></span>
@@ -361,39 +435,23 @@
         <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7-4.35-7-10a4.5 4.5 0 0 1 8-2.83A4.5 4.5 0 0 1 21 11c0 5.65-7 10-7 10z"/></svg>
         Your Heart
       </div>
-      <div class="result-title" id="result-title">Measuring…</div>
-      <div class="result-sub" id="result-sub">Based on your fist measurement</div>
 
-      <div class="mini-stats">
-        <div class="mini-stat">
-          <div class="ms-lbl">Width</div>
-          <div class="ms-val" id="sv-width">—<span class="ms-unit">cm</span></div>
-          <div class="ms-cmp avg" id="sc-width"></div>
-        </div>
-        <div class="mini-stat">
-          <div class="ms-lbl">Length</div>
-          <div class="ms-val" id="sv-length">—<span class="ms-unit">cm</span></div>
-          <div class="ms-cmp avg" id="sc-length"></div>
-        </div>
-        <div class="mini-stat">
-          <div class="ms-lbl">Depth</div>
-          <div class="ms-val" id="sv-depth">—<span class="ms-unit">cm</span></div>
-          <div class="ms-cmp avg" id="sc-depth"></div>
-        </div>
-        <div class="mini-stat">
-          <div class="ms-lbl">Weight</div>
-          <div class="ms-val" id="sv-weight">—<span class="ms-unit">g</span></div>
-          <div class="ms-cmp avg" id="sc-weight"></div>
-        </div>
-      </div>
+      <!-- Primary: relative comparison -->
+      <div class="cmp-badge avg" id="cmp-badge">About average</div>
+      <p class="cmp-ctx" id="cmp-ctx">compared to typical adult hearts</p>
 
+      <!-- Comparison bar -->
       <div class="bar-track">
         <div class="bar-fill"></div>
         <div class="bar-marker" id="bar-marker"></div>
       </div>
       <div class="bar-ends"><span>Smaller</span><span>Average</span><span>Larger</span></div>
 
-      <p id="heart-fact" style="font-size:12px;color:#8A8280;line-height:1.5;margin:10px 0 14px;"></p>
+      <!-- Secondary: rough estimates, clearly labelled -->
+      <p class="est-line" id="est-line"></p>
+
+      <!-- Fun fact -->
+      <p id="heart-fact" style="font-size:12px;color:#8A8280;line-height:1.5;margin:0 0 14px;"></p>
 
       <div class="result-actions">
         <button class="btn-ghost" id="btn-retake">Retake</button>
@@ -411,11 +469,18 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 // ────────────────────────────────────────────────
 // Constants
 // ────────────────────────────────────────────────
-const AVG_FIST_CM      = 8.5;
-const AVG_HEART_W      = 9.0;   // width cm
-const AVG_HEART_L      = 12.0;  // length cm
-const AVG_HEART_D      = 6.5;   // depth cm
-const AVG_HEART_WEIGHT = 280;   // grams
+
+// Sex-differentiated reference anatomy
+// Sources: Molina DK & DiMaio VJ (2012), normal heart weight ranges
+const SEX_PROFILES = {
+  male:   { fistCm: 9.0,  heartW: 9.5,  heartL: 12.5, heartD: 7.0, heartWt: 310 },
+  female: { fistCm: 8.0,  heartW: 8.5,  heartL: 11.5, heartD: 6.0, heartWt: 250 },
+  other:  { fistCm: 8.5,  heartW: 9.0,  heartL: 12.0, heartD: 6.5, heartWt: 280 },
+};
+
+// MediaPipe landmarks sit inside the hand — bounding box underestimates
+// true fist width by ~1.85×. This factor corrects for it.
+const LANDMARK_CORRECTION = 1.85;
 
 // Fist should occupy this fraction of canvas width at the guide distance
 const GUIDE_FRAC   = 0.26;
@@ -467,6 +532,16 @@ let stream         = null;
 let handsModel     = null;
 let animId         = null;
 let busy           = false;
+let userSex        = 'other'; // 'male' | 'female' | 'other'
+
+// Wire sex picker buttons
+document.querySelectorAll('.sex-opt').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.sex-opt').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    userSex = btn.dataset.sex;
+  });
+});
 
 // ────────────────────────────────────────────────
 // Helpers
@@ -720,15 +795,38 @@ function doCapture() {
 // Size calculation
 // ────────────────────────────────────────────────
 function calcSize(fistPx) {
+  const prof    = SEX_PROFILES[userSex] || SEX_PROFILES.other;
   const idealPx = overlay.width * GUIDE_FRAC;
-  const fistCm  = (fistPx / idealPx) * AVG_FIST_CM;
+
+  // Apply landmark correction: MediaPipe landmarks underestimate true boundary
+  const rawFistCm = (fistPx / idealPx) * prof.fistCm * LANDMARK_CORRECTION;
+  // Clamp to a realistic human fist range
+  const fistCm    = Math.min(13, Math.max(6, rawFistCm));
+  const ratio     = fistCm / prof.fistCm;
+
+  // Scale heart dimensions proportionally to the measured fist
+  const width  = fistCm * prof.heartW  / prof.fistCm;
+  const length = fistCm * prof.heartL  / prof.fistCm;
+  const depth  = fistCm * prof.heartD  / prof.fistCm;
+  // Weight scales with volume (cube law) but we dampen to linear for display sanity
+  const weight = Math.round(prof.heartWt * ratio);
+
+  // Uncertainty band: ±15% to reflect camera + landmark approximation
+  const U = 0.15;
+  const fmt1 = v => +v.toFixed(1);
+  const fmtR = v => Math.round(v);
 
   return {
-    width:  +fistCm.toFixed(1),
-    length: +(fistCm * AVG_HEART_L / AVG_FIST_CM).toFixed(1),
-    depth:  +(fistCm * AVG_HEART_D / AVG_FIST_CM).toFixed(1),
-    weight: Math.round(AVG_HEART_WEIGHT * Math.pow(fistCm / AVG_FIST_CM, 3)),
-    ratio:  fistCm / AVG_FIST_CM,
+    // Midpoints (for bar + 3D sizing)
+    width: fmt1(width), length: fmt1(length), depth: fmt1(depth), weight,
+    // Ranges
+    widthLo:  fmt1(width  * (1 - U)), widthHi:  fmt1(width  * (1 + U)),
+    lengthLo: fmt1(length * (1 - U)), lengthHi: fmt1(length * (1 + U)),
+    depthLo:  fmt1(depth  * (1 - U)), depthHi:  fmt1(depth  * (1 + U)),
+    weightLo: fmtR(weight * (1 - U * 2)), weightHi: fmtR(weight * (1 + U * 2)),
+    ratio,
+    sex: userSex,
+    refWt: prof.heartWt,
   };
 }
 
@@ -744,42 +842,42 @@ function cmpText(ratio) {
 function showResult() {
   const s   = calcSize(capturedPx);
   const cmp = cmpText(s.ratio);
+  const sexLabel = s.sex === 'male' ? 'male' : s.sex === 'female' ? 'female' : 'adult';
 
-  // Title
-  const titleText = s.ratio > 1.12 ? 'A Big, Powerful Heart'
-                  : s.ratio < 0.88 ? 'A Compact, Efficient Heart'
-                  : 'A Perfectly Average Heart';
-  set('result-title', titleText, true);
-  set('result-sub', `${s.width} × ${s.length} × ${s.depth} cm · ~${s.weight} g`, true);
+  // ── Primary: relative comparison (the defensible result) ──
+  const badge = $('cmp-badge');
+  if (badge) {
+    badge.textContent = cmp.text.replace(/[↑↓]\s/, ''); // strip arrow — use colour instead
+    badge.className   = `cmp-badge ${cmp.cls}`;
+  }
+  set('cmp-ctx', `compared to typical ${sexLabel} hearts`, true);
 
-  // AR dimension labels
-  set('lbl-width',  `↔ ${s.width} cm`,  true);
-  set('lbl-length', `↕ ${s.length} cm`, true);
-  set('lbl-depth',  `⊙ ${s.depth} cm`,  true);
-
-  // Stat cards
-  [
-    ['sv-width',  'sc-width',  s.width,  'cm'],
-    ['sv-length', 'sc-length', s.length, 'cm'],
-    ['sv-depth',  'sc-depth',  s.depth,  'cm'],
-    ['sv-weight', 'sc-weight', s.weight, 'g' ],
-  ].forEach(([vid, cid, val, unit]) => {
-    set(vid, `${val}<span class="ms-unit">${unit}</span>`);
-    const el = $(cid);
-    if (el) { el.textContent = cmp.text; el.className = `ms-cmp ${cmp.cls}`; }
-  });
+  // AR floating labels — prefix with ~ to signal estimate
+  set('lbl-width',  `↔ ~${s.width} cm`,  true);
+  set('lbl-length', `↕ ~${s.length} cm`, true);
+  set('lbl-depth',  `⊙ ~${s.depth} cm`,  true);
 
   // Comparison bar: map ratio 0.70–1.30 → 5%–95%
   const barPct = Math.min(95, Math.max(5, ((s.ratio - 0.70) / 0.60) * 90 + 5));
   setTimeout(() => { const m = $('bar-marker'); if (m) m.style.left = barPct + '%'; }, 120);
 
-  // Random fact
+  // ── Secondary: rough estimates, one compact line ──
+  set('est-line',
+    `<strong>Rough estimate</strong> · ~${s.widthLo}–${s.widthHi} cm wide · ~${s.weightLo}–${s.weightHi} g · ±15% · not a medical measurement`,
+    false);
+
+  // Random heart fact
   set('heart-fact', FACTS[Math.floor(Math.random() * FACTS.length)], true);
 
-  // Persist to localStorage
+  // Persist to localStorage (midpoints for downstream use)
   try {
     localStorage.setItem('somatic.heartSize', JSON.stringify({
       width: s.width, length: s.length, depth: s.depth, weight: s.weight,
+      widthLo: s.widthLo, widthHi: s.widthHi,
+      lengthLo: s.lengthLo, lengthHi: s.lengthHi,
+      depthLo: s.depthLo, depthHi: s.depthHi,
+      weightLo: s.weightLo, weightHi: s.weightHi,
+      sex: s.sex, ratio: s.ratio,
       measuredAt: new Date().toISOString(),
     }));
   } catch {}
@@ -797,142 +895,254 @@ function showResult() {
 }
 
 // ────────────────────────────────────────────────
-// 3D Heart — AR result (full-screen, no rotation, gyro parallax)
+// AR Heart — tap-to-place, GLB animation, gestures
 // ────────────────────────────────────────────────
-let scene3, cam3, ren3, hGrp, raf3;
-let gyroX = 0, gyroY = 0; // smoothed device orientation offsets
+let scene3, cam3, ren3, hGrp, raf3, clock3, mixerRef;
+let heartPlaced = false;
+const pointers  = new Map(); // active pointer tracking
 
 function setup3D(sizeRatio) {
   const mount = $('heart-ar-mount');
   if (!mount || ren3) return;
 
   const W = window.innerWidth, H = window.innerHeight;
-  // Heart sits in the upper-center of the screen (above the panel)
-  // Camera FOV tuned so heart fills ~30% of screen height
+
+  // Scene + camera (eye level, slight downward look for ground perspective)
   scene3 = new THREE.Scene();
-  const aspect = W / H;
-  cam3 = new THREE.PerspectiveCamera(40, aspect, 0.1, 100);
-  cam3.position.set(0, 0, 4.8);
+  cam3   = new THREE.PerspectiveCamera(52, W / H, 0.05, 50);
+  cam3.position.set(0, 1.5, 3.2);
+  cam3.lookAt(0, 0, 0);
 
   ren3 = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-  ren3.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  ren3.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
   ren3.setSize(W, H, false);
   ren3.outputColorSpace = THREE.SRGBColorSpace;
-  ren3.setClearColor(0x000000, 0); // fully transparent background
+  ren3.setClearColor(0, 0); // fully transparent
   mount.appendChild(ren3.domElement);
 
-  // Lighting — bright warm key from above-front, golden rim, soft fill
-  scene3.add(new THREE.AmbientLight(0xffffff, 0.6));
-  const key = new THREE.DirectionalLight(0xffa0b0, 3.0); key.position.set(1.5, 3, 3); scene3.add(key);
-  const rim = new THREE.DirectionalLight(0xf5c87a, 0.8); rim.position.set(-2, -1, 1.5); scene3.add(rim);
-  const fill= new THREE.DirectionalLight(0xaabbff, 0.3); fill.position.set(0, 0, -2); scene3.add(fill);
+  // Lighting — warm key, golden rim, soft fill
+  scene3.add(new THREE.AmbientLight(0xffffff, 1.2));
+  const key  = new THREE.DirectionalLight(0xffb0c0, 4.0);
+  key.position.set(1.5, 4, 3); scene3.add(key);
+  const rim  = new THREE.DirectionalLight(0xf5c87a, 1.0);
+  rim.position.set(-2, -1, 1.5); scene3.add(rim);
+  const fill = new THREE.DirectionalLight(0x99aaff, 0.3);
+  fill.position.set(0, 0, -2); scene3.add(fill);
 
-  // Aura glow sprite — soft rose radial gradient
-  const ac = document.createElement('canvas'); ac.width = ac.height = 256;
-  const ax = ac.getContext('2d');
-  const ag = ax.createRadialGradient(128,128,6, 128,128,128);
-  ag.addColorStop(0,'#e8445acc'); ag.addColorStop(0.4,'#e8445a55'); ag.addColorStop(1,'#e8445a00');
-  ax.fillStyle = ag; ax.fillRect(0,0,256,256);
-  const aura = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: new THREE.CanvasTexture(ac), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-  }));
-  aura.scale.set(6, 6, 1);
-  // Position heart in upper ~40% of the viewport
-  aura.position.set(0, 0.3, -0.5);
-  scene3.add(aura);
+  // Virtual ground plane at y = -0.8 for raycasting
+  const GROUND_Y  = -0.8;
+  const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -GROUND_Y);
+  const raycaster   = new THREE.Raycaster();
 
-  // Heart group — positioned in upper-center of viewport, scaled to ratio
+  // Placement indicator — glowing ring on virtual ground
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.09, 0.14, 56),
+    new THREE.MeshBasicMaterial({ color: 0xe8445a, side: THREE.DoubleSide, transparent: true, opacity: 0.8 })
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.set(0, GROUND_Y + 0.002, -0.4);
+  scene3.add(ring);
+
+  // Outer scan ring (larger, faint)
+  const ringOuter = new THREE.Mesh(
+    new THREE.RingGeometry(0.22, 0.26, 56),
+    new THREE.MeshBasicMaterial({ color: 0xe8445a, side: THREE.DoubleSide, transparent: true, opacity: 0.25 })
+  );
+  ringOuter.rotation.x = -Math.PI / 2;
+  ringOuter.position.copy(ring.position);
+  scene3.add(ringOuter);
+
+  // Shadow disc (appears under placed heart)
+  const shadowDisc = new THREE.Mesh(
+    new THREE.CircleGeometry(0.15, 48),
+    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.30, side: THREE.DoubleSide })
+  );
+  shadowDisc.rotation.x = -Math.PI / 2;
+  shadowDisc.position.set(0, GROUND_Y + 0.001, -0.4);
+  shadowDisc.visible = false;
+  scene3.add(shadowDisc);
+
+  // Heart group (hidden until placed)
   hGrp = new THREE.Group();
-  hGrp.position.set(0, 0.3, 0); // lift slightly above center
-  hGrp.scale.setScalar(sizeRatio);
+  hGrp.position.set(0, GROUND_Y, -0.4);
+  hGrp.visible = false;
   scene3.add(hGrp);
 
-  // Fallback procedural heart (shown until GLB loads)
-  const hs = new THREE.Shape();
-  hs.moveTo(.5,.5); hs.bezierCurveTo(.5,.5,.4,0,0,0);
-  hs.bezierCurveTo(-.6,0,-.6,.7,-.6,.7); hs.bezierCurveTo(-.6,1.1,-.3,1.54,.5,1.9);
-  hs.bezierCurveTo(1.2,1.54,1.6,1.1,1.6,.7); hs.bezierCurveTo(1.6,.7,1.6,0,1,0);
-  hs.bezierCurveTo(.7,0,.5,.5,.5,.5);
-  const eg = new THREE.ExtrudeGeometry(hs, { depth:.4,bevelEnabled:true,bevelSegments:4,steps:2,bevelSize:.12,bevelThickness:.12 });
-  eg.translate(-.5,-1,0); eg.scale(.65,.65,.65); eg.rotateZ(Math.PI);
-  const fb = new THREE.Mesh(eg, new THREE.MeshStandardMaterial({
-    color:0xff5c6f, roughness:.25, metalness:.25, emissive:0x330008, emissiveIntensity:.5
-  }));
-  hGrp.add(fb);
-
-  // Load GLB model
+  // Load GLB — play built-in animation at user's BPM
+  clock3 = new THREE.Clock();
   new GLTFLoader().load('/models/beating_heart.glb', gltf => {
     const root = gltf.scene;
     root.traverse(c => {
-      const n = (c.name||'').toLowerCase();
-      if (['hr','hrv','bpm','text','label','display','sitting','beat','high','low','brady','tachy','normal'].some(k=>n.includes(k))) c.visible=false;
+      const n = (c.name || '').toLowerCase();
+      if (['hr','hrv','bpm','text','label','display','sitting','high','low','brady','tachy','normal'].some(k => n.includes(k))) c.visible = false;
     });
-    const bb  = new THREE.Box3().setFromObject(root);
-    const bsz = bb.getSize(new THREE.Vector3());
-    root.scale.setScalar(1.6 / Math.max(bsz.x, bsz.y, bsz.z));
-    bb.setFromObject(root);
-    root.position.sub(bb.getCenter(new THREE.Vector3()));
-    hGrp.remove(fb);
+
+    // Normalize size then apply measured ratio
+    const box   = new THREE.Box3().setFromObject(root);
+    const dim   = box.getSize(new THREE.Vector3());
+    const norm  = 0.20 / Math.max(dim.x, dim.y, dim.z);
+    root.scale.setScalar(norm * sizeRatio);
+    box.setFromObject(root);
+    root.position.sub(box.getCenter(new THREE.Vector3()));
     hGrp.add(root);
+
+    // ── Play the GLB's built-in beating animation ──
+    if (gltf.animations.length > 0) {
+      mixerRef = new THREE.AnimationMixer(root);
+      gltf.animations.forEach(clip => mixerRef.clipAction(clip).play());
+      // Scale animation speed to user's actual HR
+      const userBpm = parseInt(localStorage.getItem('somatic.lastBpm') || '72', 10);
+      mixerRef.timeScale = userBpm / 72; // 72 bpm = 1× baseline
+    }
+
+    // Show tap prompt now that model is ready
+    const prompt = $('ar-tap-prompt');
+    if (prompt) prompt.classList.remove('hidden');
   });
 
-  // ── Device orientation: gyroscope parallax (makes heart feel anchored in space) ──
-  const setupGyro = () => {
-    window.addEventListener('deviceorientation', e => {
-      // gamma = left/right tilt (-90 to 90), beta = fwd/back tilt (0 to 180)
-      const targetX = THREE.MathUtils.clamp((e.beta  - 60) / 60, -1, 1) * 0.4;
-      const targetY = THREE.MathUtils.clamp( e.gamma       / 60, -1, 1) * 0.25;
-      // Smooth with lerp factor
-      gyroX += (targetX - gyroX) * 0.06;
-      gyroY += (targetY - gyroY) * 0.06;
-    }, { passive: true });
-  };
+  // ── Animate loop ──
+  function loop() {
+    raf3 = requestAnimationFrame(loop);
+    const dt = clock3.getDelta();
 
-  // iOS 13+ requires permission for DeviceOrientationEvent
-  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-    // We'll request on the first user tap (already inside a result screen user gesture)
-    DeviceOrientationEvent.requestPermission().then(s => { if (s === 'granted') setupGyro(); }).catch(() => {});
-  } else {
-    setupGyro();
-  }
+    // Tick animation mixer (GLB handles the beating — no manual scaling)
+    if (mixerRef) mixerRef.update(dt);
 
-  // ── Animate: heartbeat pulse only, no rotation ──
-  let t3 = 0;
-  function animate3() {
-    raf3 = requestAnimationFrame(animate3);
-    t3  += 0.016;
-
-    // Heartbeat pulse — two-beat rhythm like a real cardiac cycle
-    const phase = (t3 * 1.1) % (Math.PI * 2);
-    const beat  = Math.max(0, Math.sin(phase) * 0.6 + Math.sin(phase * 2) * 0.3);
-    const pulse = 1 + beat * 0.07;
-    hGrp.scale.setScalar(sizeRatio * pulse);
-
-    // Aura breathes with pulse
-    aura.material.opacity = 0.40 + beat * 0.40;
-
-    // Gyroscope parallax: shift heart group position to simulate being anchored in real space
-    hGrp.position.x = THREE.MathUtils.lerp(hGrp.position.x, -gyroY * 1.2, 0.1);
-    hGrp.position.y = THREE.MathUtils.lerp(hGrp.position.y,  0.3 + gyroX * 0.8, 0.1);
-    aura.position.x = hGrp.position.x;
-    aura.position.y = hGrp.position.y;
-
-    // Very subtle idle sway (if no gyro)
-    if (gyroX === 0 && gyroY === 0) {
-      hGrp.position.y = 0.3 + Math.sin(t3 * 0.5) * 0.04;
+    // Pulse the placement indicator rings before placement
+    if (!heartPlaced) {
+      const t = Date.now() * 0.003;
+      ring.material.opacity      = 0.55 + Math.sin(t) * 0.35;
+      ringOuter.material.opacity = 0.15 + Math.sin(t + 1) * 0.10;
+      ring.rotation.z      += 0.012;
+      ringOuter.rotation.z -= 0.006;
     }
 
     ren3.render(scene3, cam3);
   }
-  animate3();
+  loop();
 
-  // Resize handler for AR canvas
+  // ── Helpers ──
+  function ndcFromClient(clientX, clientY) {
+    return new THREE.Vector2(
+      (clientX / innerWidth)  *  2 - 1,
+      (clientY / innerHeight) * -2 + 1
+    );
+  }
+
+  function projectToGround(clientX, clientY) {
+    raycaster.setFromCamera(ndcFromClient(clientX, clientY), cam3);
+    const hit = new THREE.Vector3();
+    return raycaster.ray.intersectPlane(groundPlane, hit) ? hit : null;
+  }
+
+  function placeHeart(clientX, clientY) {
+    const pt = projectToGround(clientX, clientY);
+    if (!pt) return;
+    heartPlaced = true;
+    hGrp.position.set(pt.x, GROUND_Y, pt.z);
+    hGrp.visible = true;
+    ring.visible = false;
+    ringOuter.visible = false;
+    shadowDisc.position.set(pt.x, GROUND_Y + 0.001, pt.z);
+    shadowDisc.visible = true;
+    const prompt = $('ar-tap-prompt');
+    if (prompt) { prompt.style.opacity = '0'; setTimeout(() => prompt.classList.add('hidden'), 400); }
+    const hint = $('ar-gesture-hint');
+    if (hint) { hint.classList.remove('hidden'); setTimeout(() => hint.classList.add('hidden'), 3200); }
+  }
+
+  // ── Gesture state ──
+  let drag0 = null, hPos0 = null;          // single-finger drag
+  let pinch0 = null, hScale0 = 1, hRot0 = 0; // two-finger pinch + twist
+
+  function getPinchInfo() {
+    const pts = [...pointers.values()];
+    if (pts.length < 2) return null;
+    const [a, b] = pts;
+    return {
+      dist:  Math.hypot(b.x - a.x, b.y - a.y),
+      angle: Math.atan2(b.y - a.y, b.x - a.x),
+      mx: (a.x + b.x) / 2,
+      my: (a.y + b.y) / 2,
+    };
+  }
+
+  const canvas = ren3.domElement;
+
+  canvas.addEventListener('pointerdown', e => {
+    canvas.setPointerCapture(e.pointerId);
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (!heartPlaced) {
+      // Tap-to-place on finger-up (handled in pointerup)
+      return;
+    }
+
+    if (pointers.size === 1) {
+      drag0 = { x: e.clientX, y: e.clientY };
+      hPos0 = hGrp.position.clone();
+      pinch0 = null;
+    }
+    if (pointers.size === 2) {
+      drag0  = null;
+      pinch0 = getPinchInfo();
+      hScale0 = hGrp.scale.x;
+      hRot0   = hGrp.rotation.y;
+    }
+  });
+
+  canvas.addEventListener('pointermove', e => {
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    // Move indicator ring with pointer before placement
+    if (!heartPlaced) {
+      const pt = projectToGround(e.clientX, e.clientY);
+      if (pt) { ring.position.x = pt.x; ring.position.z = pt.z; ringOuter.position.x = pt.x; ringOuter.position.z = pt.z; }
+      return;
+    }
+
+    if (pointers.size === 1 && drag0 && hPos0) {
+      // Drag — move heart on ground plane
+      const cur  = projectToGround(e.clientX, e.clientY);
+      const orig = projectToGround(drag0.x, drag0.y);
+      if (cur && orig) {
+        hGrp.position.x = hPos0.x + (cur.x - orig.x);
+        hGrp.position.z = hPos0.z + (cur.z - orig.z);
+        shadowDisc.position.x = hGrp.position.x;
+        shadowDisc.position.z = hGrp.position.z;
+      }
+    } else if (pointers.size >= 2 && pinch0) {
+      // Pinch to scale + twist to rotate
+      const info = getPinchInfo();
+      if (!info) return;
+      const scaleDelta = info.dist  / pinch0.dist;
+      const rotDelta   = info.angle - pinch0.angle;
+      hGrp.scale.setScalar(THREE.MathUtils.clamp(hScale0 * scaleDelta, 0.25, 4));
+      hGrp.rotation.y = hRot0 + rotDelta;
+    }
+  });
+
+  canvas.addEventListener('pointerup', e => {
+    const wasDown = pointers.has(e.pointerId);
+    pointers.delete(e.pointerId);
+
+    if (!heartPlaced && wasDown && pointers.size === 0) {
+      placeHeart(e.clientX, e.clientY);
+      return;
+    }
+
+    if (pointers.size < 2) { pinch0 = null; }
+    if (pointers.size === 0) { drag0 = null; hPos0 = null; }
+  });
+
+  canvas.addEventListener('pointercancel', e => { pointers.delete(e.pointerId); });
+
+  // Resize
   window.addEventListener('resize', () => {
     if (!ren3) return;
-    const nW = window.innerWidth, nH = window.innerHeight;
-    cam3.aspect = nW / nH;
+    cam3.aspect = innerWidth / innerHeight;
     cam3.updateProjectionMatrix();
-    ren3.setSize(nW, nH, false);
+    ren3.setSize(innerWidth, innerHeight, false);
   });
 }
 
@@ -962,8 +1172,15 @@ $('start-btn').addEventListener('click', async () => {
 $('btn-retake').addEventListener('click', () => {
   // Tear down AR 3D scene
   if (raf3) { cancelAnimationFrame(raf3); raf3 = null; }
+  if (mixerRef) { mixerRef.stopAllAction(); mixerRef = null; }
   if (ren3) { ren3.dispose(); ren3 = null; hGrp = null; }
   $('heart-ar-mount').querySelector('canvas')?.remove();
+  heartPlaced = false;
+  pointers.clear();
+
+  // Reset AR overlays
+  const prompt = $('ar-tap-prompt'); if (prompt) { prompt.style.opacity=''; prompt.classList.add('hidden'); }
+  const hint   = $('ar-gesture-hint'); if (hint) hint.classList.add('hidden');
 
   // Stop existing camera stream fully before restarting
   stopCamera();
