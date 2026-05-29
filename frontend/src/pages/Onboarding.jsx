@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { setProfile, getProfile } from "@/lib/wellness";
-import BeatingHeart3D from "@/components/BeatingHeart3D";
 import { ChevronRight, Sparkles } from "lucide-react";
 
 const SLIDES = [
@@ -53,7 +52,7 @@ export default function Onboarding() {
               className="flex flex-col items-center"
             >
               <div className="relative" style={{ width: 280, height: 280 }}>
-                {s.visual === "heart" && <BeatingHeart3D bpm={58} hrv={28} size={280} />}
+                {s.visual === "heart" && <PulseArt />}
                 {s.visual === "wave" && <WaveArt />}
                 {s.visual === "sparkle" && <SparkleArt />}
               </div>
@@ -107,6 +106,40 @@ export default function Onboarding() {
     );
   }
   return null;
+}
+
+function PulseArt() {
+  return (
+    <div className="relative w-[280px] h-[280px] grid place-items-center">
+      {/* Concentric pulse rings */}
+      {[0, 0.5, 1.0].map((delay, i) => (
+        <div
+          key={i}
+          className="absolute rounded-full border border-[#E8445A]"
+          style={{
+            width: 80 + i * 60, height: 80 + i * 60,
+            opacity: 0.6 - i * 0.18,
+            animation: `pulse-ring 2.2s ease-out ${delay}s infinite`,
+          }}
+        />
+      ))}
+      {/* Centre dot */}
+      <div className="w-4 h-4 rounded-full bg-[#E8445A]" style={{ boxShadow: "0 0 18px rgba(232,68,90,0.7)" }} />
+      {/* ECG line across */}
+      <svg viewBox="0 0 280 60" width="220" height="44" className="absolute" style={{ bottom: 52 }}>
+        <defs>
+          <linearGradient id="ecg-g" x1="0" x2="1">
+            <stop offset="0" stopColor="#E8445A" stopOpacity="0" />
+            <stop offset="0.3" stopColor="#E8445A" />
+            <stop offset="0.7" stopColor="#F5C87A" />
+            <stop offset="1" stopColor="#F5C87A" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path d="M0 30 L55 30 L70 30 L82 6 L94 54 L106 18 L118 30 L225 30 L280 30"
+          fill="none" stroke="url(#ecg-g)" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+    </div>
+  );
 }
 
 function WaveArt() {

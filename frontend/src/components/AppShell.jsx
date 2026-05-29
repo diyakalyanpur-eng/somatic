@@ -11,7 +11,7 @@ export default function AppShell({ children }) {
   useEffect(() => { setBpm(getLatestBpm() || 60); }, [loc.pathname]);
   const showHeader = loc.pathname !== "/onboarding";
   return (
-    <div className="App noise-bg min-h-screen">
+    <div className="App noise-bg" style={{ minHeight: '100dvh' }}>
       {showHeader && (
         <header className="sticky top-0 z-40 bg-[#0A0A0F]/95 backdrop-blur-md border-b border-[#1F1F2E]" data-testid="app-header">
           <div className="max-w-md mx-auto px-5 h-14 flex items-center justify-between">

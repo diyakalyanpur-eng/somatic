@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Camera, Fingerprint, Lock, X, BellRing, Stethoscope } from "lucide-react";
-import BeatingHeart3D from "@/components/BeatingHeart3D";
+import { Camera, Fingerprint, Lock, X, BellRing, Stethoscope, Hand } from "lucide-react";
 import { notifyMe } from "@/lib/api";
 import { toast } from "sonner";
 
@@ -69,8 +68,17 @@ export default function Scan() {
           transition={{ duration: 0.3 }}
           className="mt-5 rounded-3xl bg-[#13131A] border border-[#1F1F2E] p-5"
         >
-          <div className="flex items-center justify-center my-2">
-            <BeatingHeart3D bpm={60} hrv={28} size={260} />
+          {/* Abstract scan-mode visual — heart model is the reward after scan */}
+          <div className="flex items-center justify-center my-4" style={{ height: 160 }}>
+            <div className="relative flex items-center justify-center" style={{ width: 160, height: 160 }}>
+              <div className="absolute rounded-full border border-[#E8445A]/15" style={{ width: 155, height: 155, animation: "pulse-ring 3s ease-out infinite" }} />
+              <div className="absolute rounded-full border border-[#E8445A]/25" style={{ width: 110, height: 110, animation: "pulse-ring 3s ease-out 0.8s infinite" }} />
+              <div className="absolute rounded-full border border-[#E8445A]/35" style={{ width: 70, height: 70, animation: "pulse-ring 3s ease-out 1.6s infinite" }} />
+              {active === "rppg"
+                ? <svg viewBox="0 0 48 48" width="40" height="40" fill="none" stroke="#E8445A" strokeWidth="1.5" strokeLinecap="round"><circle cx="24" cy="20" r="8"/><path d="M8 40c0-8.837 7.163-16 16-16s16 7.163 16 16"/></svg>
+                : <svg viewBox="0 0 48 48" width="40" height="40" fill="none" stroke="#E8445A" strokeWidth="1.5" strokeLinecap="round"><rect x="16" y="8" width="16" height="28" rx="8"/><path d="M24 36v6M18 42h12"/></svg>
+              }
+            </div>
           </div>
           <div className="text-center">
             <h3 className="display text-xl font-semibold tracking-tight">{active === "rppg" ? "Face Scan" : "Finger Scan"}</h3>
@@ -87,6 +95,29 @@ export default function Scan() {
           <p className="mt-2 text-[10px] text-center text-[#8A8280]">Wellness signal · not a medical diagnosis</p>
         </motion.div>
       )}
+
+      {/* Heart Size feature card — separate section, does not affect the tabs above */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.1 }}
+        className="mt-4 rounded-3xl bg-[#13131A] border border-[#1F1F2E] p-5 flex items-center gap-4"
+      >
+        <span className="shrink-0 w-11 h-11 rounded-2xl bg-[#1A1118] border border-[#E8445A]/30 grid place-items-center">
+          <Hand className="w-5 h-5 text-[#E8445A]" />
+        </span>
+        <div className="flex-1 min-w-0">
+          <h3 className="display text-[15px] font-semibold tracking-tight">Heart Size</h3>
+          <p className="text-[12px] text-[#8A8280] leading-snug mt-0.5">Measure your heart with your fist — camera-based, no hardware.</p>
+        </div>
+        <button
+          onClick={() => { window.location.href = "/heartsize.html"; }}
+          className="shrink-0 inline-flex items-center justify-center h-9 px-4 rounded-xl bg-[#1F1F2E] text-[#F0EDE8] text-[13px] font-medium hover:bg-[#2A2A3A] transition-colors"
+          data-testid="heartsize-launch"
+        >
+          Measure
+        </button>
+      </motion.div>
 
       {showLock && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60" onClick={() => setShowLock(false)} data-testid="auscult-locked-sheet">

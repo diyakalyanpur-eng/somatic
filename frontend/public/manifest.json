@@ -3,6 +3,7 @@
   "short_name": "Somatic",
   "description": "Camera-based heart scan in 30 seconds. No hardware needed.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0A0A0F",

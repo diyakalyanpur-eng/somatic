@@ -1,11 +1,26 @@
+@keyframes pulse-ring {
+  0%   { transform: scale(1);   opacity: 0.7; }
+  100% { transform: scale(1.4); opacity: 0;   }
+}
+
 .App {
+  min-height: 100dvh;
+  /* Fallback for browsers without dvh support */
   min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: hidden;
   background:
     radial-gradient(1100px circle at 50% -10%, rgba(232, 68, 90, 0.10), rgba(10, 10, 15, 0) 55%),
     radial-gradient(700px circle at 90% 0%, rgba(245, 200, 122, 0.05), rgba(10, 10, 15, 0) 52%),
     #0A0A0F;
 }
-.app-page { min-height: calc(100vh - 64px); padding-bottom: 80px; }
+/* Page content: sits below the sticky header (56px) and above the bottom nav (64px) + safe area */
+.app-page {
+  min-height: calc(100dvh - 56px);
+  min-height: calc(100vh - 56px); /* fallback */
+  min-height: calc(100dvh - 56px);
+  padding-bottom: calc(80px + env(safe-area-inset-bottom));
+}
 
 .gradient-text {
   background: linear-gradient(90deg, #F0EDE8 0%, #E8445A 60%, #F5C87A 100%);

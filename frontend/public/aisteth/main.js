@@ -203,9 +203,19 @@ function setupHeartScene() {
 // ─────────────────────────────────────────────────────────
 // Camera lifecycle
 // ─────────────────────────────────────────────────────────
+// Returns true on success, false on failure.
+// Must be callable from a user-gesture context (required by iOS PWA).
 async function startCamera() {
   const video = $('video');
-  if (!video) return;
+  if (!video) return false;
+
+  // mediaDevices not available (e.g. non-HTTPS, or very old browser)
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    console.error('[somatic] mediaDevices unavailable');
+    setStartLabel('Camera not supported', true);
+    $('cal-sub').textContent = 'Your browser does not support camera access. Try opening in Safari or Chrome.';
+    return false;
+  }
 
   const facingMode = mode === 'finger' ? { exact: 'environment' } : 'user';
   const constraints = {
@@ -221,13 +231,21 @@ async function startCamera() {
   try {
     stream = await navigator.mediaDevices.getUserMedia(constraints);
   } catch (e) {
-    // Fallback without facingMode constraint
-    try { stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: true }); }
-    catch (err) {
+    // Fallback 1: drop the facingMode constraint (works when exact: 'environment' fails)
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { width: { ideal: 640 }, height: { ideal: 480 } },
+      });
+    } catch (err) {
       console.error('[somatic] camera denied', err);
-      setStartLabel('Camera unavailable', true);
-      $('cal-sub').textContent = 'Please allow camera access from your browser to begin a scan.';
-      return;
+      // Permission denied vs not found — give user actionable message
+      const isDenied = err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError';
+      setStartLabel('Allow camera & retry', false); // keep button enabled so they can retry
+      $('cal-sub').textContent = isDenied
+        ? 'Camera permission denied. Open your phone Settings → Safari/Chrome → Camera → Allow, then tap the button again.'
+        : 'Camera unavailable. Make sure no other app is using it, then tap the button again.';
+      return false;
     }
   }
 
@@ -254,6 +272,7 @@ async function startCamera() {
   }
 
   setStartLabel('Begin scan', false);
+  return true;
 }
 
 async function stopCamera() {
@@ -405,8 +424,15 @@ function finishScan(_auto = false) {
 // ─────────────────────────────────────────────────────────
 // Wiring
 // ─────────────────────────────────────────────────────────
-$('start-btn').addEventListener('click', () => {
-  if (!stream) return;
+$('start-btn').addEventListener('click', async () => {
+  // If camera isn't running yet (auto-start failed, or PWA needed a user gesture),
+  // start it now — this tap IS the required user gesture on iOS PWA.
+  if (!stream) {
+    setStartLabel('Starting camera…', true);
+    const ok = await startCamera();
+    if (!ok) return; // error message already set inside startCamera()
+    $('video')?.classList.add('dim');
+  }
   startScan();
 });
 $('finish-btn').addEventListener('click', () => {
@@ -421,9 +447,17 @@ window.addEventListener('beforeunload', () => {
 // Boot
 // ─────────────────────────────────────────────────────────
 (async function boot() {
-  setStartLabel('Preparing camera…', true);
+  // Show an enabled button immediately — on iOS PWA getUserMedia must be
+  // called inside a user gesture, so we can't block the button on auto-start.
+  setStartLabel('Begin scan', false);
   setupHeartScene();
-  // Heart is intentionally hidden during scan — clean camera view
-  await startCamera();
-  $('video').classList.add('dim'); // dim until scan begins for ambience
+
+  // Attempt to auto-start camera (works on Android PWA and desktop; may be
+  // silently skipped on iOS PWA if permission hasn't been granted yet).
+  const ok = await startCamera();
+  if (ok) {
+    $('video')?.classList.add('dim'); // dim for ambience before scan starts
+  }
+  // If auto-start failed, button stays enabled with 'Begin scan' label.
+  // The click handler will retry startCamera() as a user gesture.
 })();

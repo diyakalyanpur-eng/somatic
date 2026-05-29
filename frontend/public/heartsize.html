@@ -1,0 +1,1035 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no" />
+<meta name="theme-color" content="#0A0A0F" />
+<title>Somatic · Heart Size</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23E8445A'%3E%3Cpath d='M12 21s-7-4.35-7-10a4.5 4.5 0 0 1 8-2.83A4.5 4.5 0 0 1 21 11c0 5.65-7 10-7 10z'/%3E%3C/svg%3E" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,500;1,500&display=swap" rel="stylesheet" />
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<!-- MediaPipe Hands (loads model lazily from CDN) -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%; background: #0A0A0F; color: #F0EDE8;
+    font-family: 'Figtree', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased; overflow: hidden;
+    width: 100%; max-width: 100%;
+  }
+  button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+  .hidden { display: none !important; }
+
+  #app {
+    position: fixed; inset: 0; overflow: hidden;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* ── Topbar ── */
+  .topbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: calc(14px + env(safe-area-inset-top)) 16px 14px;
+    background: linear-gradient(180deg, rgba(10,10,15,0.92) 0%, rgba(10,10,15,0) 100%);
+    pointer-events: none;
+  }
+  .topbar > * { pointer-events: auto; }
+  .back-link {
+    display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px;
+    background: rgba(19,19,26,0.75); border: 1px solid #1F1F2E; border-radius: 999px;
+    color: #F0EDE8; text-decoration: none; font-size: 13px; font-weight: 500;
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  }
+  .brand-strip { display: inline-flex; align-items: center; gap: 7px;
+    font-size: 11px; color: #8A8280; text-transform: uppercase; letter-spacing: 0.12em; }
+  .brand-dot { width: 7px; height: 7px; border-radius: 99px; background: #E8445A;
+    box-shadow: 0 0 10px rgba(232,68,90,0.7);
+    animation: pulse-dot 1.6s ease-out infinite; }
+  @keyframes pulse-dot {
+    0%   { box-shadow: 0 0 0 0   rgba(232,68,90,.55); }
+    70%  { box-shadow: 0 0 0 10px rgba(232,68,90,0);  }
+    100% { box-shadow: 0 0 0 0   rgba(232,68,90,0);   }
+  }
+
+  /* ── Loading overlay ── */
+  #loading-overlay {
+    position: fixed; inset: 0; z-index: 80; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 18px; background: #0A0A0F;
+  }
+  .loading-ring {
+    width: 48px; height: 48px; border-radius: 99px;
+    border: 3px solid #1F1F2E; border-top-color: #E8445A;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { font-size: 14px; color: #8A8280; }
+
+  /* ── Intro screen ── */
+  #intro-screen {
+    position: fixed; inset: 0; z-index: 40; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: calc(80px + env(safe-area-inset-top)) 28px calc(40px + env(safe-area-inset-bottom));
+    background: radial-gradient(circle at 50% 25%, #1A1118 0%, #0A0A0F 65%);
+    overflow-y: auto;
+  }
+  .intro-icon {
+    width: 68px; height: 68px; border-radius: 22px; flex-shrink: 0;
+    background: linear-gradient(180deg, rgba(232,68,90,0.20), rgba(232,68,90,0.04));
+    border: 1px solid rgba(232,68,90,0.40);
+    display: grid; place-items: center; margin-bottom: 24px;
+  }
+  .intro-title {
+    font-size: 28px; font-weight: 700; letter-spacing: -0.025em;
+    text-align: center; line-height: 1.15; margin-bottom: 12px;
+  }
+  .intro-sub {
+    font-family: 'Playfair Display', serif; font-style: italic;
+    font-size: 17px; color: #8A8280; text-align: center;
+    max-width: 290px; line-height: 1.55; margin-bottom: 34px;
+  }
+  .steps {
+    width: 100%; max-width: 310px; display: flex; flex-direction: column;
+    gap: 14px; margin-bottom: 36px;
+  }
+  .step { display: flex; align-items: flex-start; gap: 13px; }
+  .step-num {
+    width: 28px; height: 28px; border-radius: 9px; flex-shrink: 0;
+    background: rgba(232,68,90,0.14); border: 1px solid rgba(232,68,90,0.28);
+    display: grid; place-items: center;
+    font-size: 11px; font-weight: 700; color: #E8445A;
+  }
+  .step-text { font-size: 14px; color: #C8C0BA; line-height: 1.45; padding-top: 4px; }
+  .step-text b { color: #F0EDE8; font-weight: 600; }
+
+  .cta-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    height: 54px; padding: 0 32px; width: 100%; max-width: 310px;
+    background: #E8445A; color: #0A0A0F; font-weight: 700; font-size: 15px;
+    border-radius: 999px; box-shadow: 0 10px 28px rgba(232,68,90,0.38);
+    transition: background-color 200ms, transform 120ms;
+  }
+  .cta-btn:active { transform: scale(0.97); }
+  .cta-btn:hover { background: #F26478; }
+  .cta-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .cal-tip { margin-top: 14px; font-size: 11px; color: #6E6862; text-align: center; max-width: 280px; }
+
+  /* ── Camera / scan screen ── */
+  #camera-screen { position: fixed; inset: 0; z-index: 30; background: #000; }
+
+  #video {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1); /* mirror front camera */
+  }
+  #guide-canvas {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    pointer-events: none;
+  }
+
+  /* Status pill */
+  #scan-status {
+    position: fixed;
+    bottom: calc(env(safe-area-inset-bottom) + 28px);
+    left: 50%; transform: translateX(-50%);
+    z-index: 45; padding: 10px 22px;
+    background: rgba(13,13,20,0.90); border: 1px solid #1F1F2E; border-radius: 999px;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    font-size: 13px; font-weight: 500; text-align: center; white-space: nowrap; max-width: 88vw;
+    transition: color 300ms, border-color 300ms;
+  }
+  #scan-status.good    { color: #7DD3A0; border-color: rgba(125,211,160,0.35); }
+  #scan-status.warn    { color: #F5C87A; border-color: rgba(245,200,122,0.35); }
+  #scan-status.neutral { color: #F0EDE8; }
+
+  /* Capture flash */
+  #capture-flash {
+    position: fixed; inset: 0; z-index: 60; background: #fff;
+    opacity: 0; pointer-events: none; transition: opacity 80ms;
+  }
+  #capture-flash.flash { opacity: 0.55; }
+
+  /* ── Result screen — AR mode ── */
+  #result-screen {
+    position: fixed; inset: 0; z-index: 35;
+    background: #000; overflow: hidden;
+  }
+
+  /* Camera feed behind the heart */
+  #ar-video {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1); /* mirror front camera */
+  }
+
+  /* Dark vignette so heart pops against any background */
+  #ar-vignette {
+    position: absolute; inset: 0; pointer-events: none;
+    background:
+      radial-gradient(ellipse 70% 55% at 50% 42%,
+        transparent 30%, rgba(0,0,0,0.45) 100%),
+      linear-gradient(180deg, rgba(0,0,0,0.30) 0%, transparent 30%, transparent 55%, rgba(0,0,0,0.55) 100%);
+  }
+
+  /* Three.js canvas — full-screen, transparent */
+  #heart-ar-mount {
+    position: absolute; inset: 0; pointer-events: none;
+  }
+  #heart-ar-mount canvas {
+    display: block; width: 100% !important; height: 100% !important;
+  }
+
+  /* Dimension labels floating over heart */
+  .ar-dim {
+    position: absolute; font-size: 11px; font-weight: 600;
+    color: rgba(240,237,232,0.88);
+    background: rgba(10,10,15,0.55);
+    padding: 3px 9px; border-radius: 999px;
+    border: 1px solid rgba(240,237,232,0.14);
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    pointer-events: none; white-space: nowrap;
+  }
+  #lbl-width  { left: 9%;  top: 50%; transform: translateY(-50%); }
+  #lbl-length { top: 14%;  left: 50%; transform: translateX(-50%); }
+  #lbl-depth  { right: 9%; top: 50%; transform: translateY(-50%); }
+
+  /* Bottom info panel — glassmorphism */
+  .ar-panel {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    padding: 14px 20px calc(22px + env(safe-area-inset-bottom));
+    background: rgba(10,10,15,0.78);
+    border-top: 1px solid rgba(255,255,255,0.08);
+    backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+    border-radius: 24px 24px 0 0;
+    max-height: 52vh; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  }
+  .ar-panel-handle {
+    width: 36px; height: 4px; border-radius: 99px;
+    background: rgba(255,255,255,0.18); margin: 0 auto 14px;
+  }
+  .result-tag {
+    display: inline-flex; align-items: center; gap: 5px; padding: 3px 11px;
+    background: rgba(232,68,90,0.12); border: 1px solid rgba(232,68,90,0.28); border-radius: 999px;
+    font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.14em; color: #E8445A;
+    margin-bottom: 8px;
+  }
+  .result-title {
+    font-size: 22px; font-weight: 700; letter-spacing: -0.025em;
+    line-height: 1.2; margin-bottom: 3px; color: #F0EDE8;
+  }
+  .result-sub { font-size: 12px; color: #8A8280; margin-bottom: 14px; }
+
+  /* Compact 4-stat row */
+  .mini-stats {
+    display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 14px;
+  }
+  .mini-stat {
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px; padding: 8px 6px; text-align: center;
+  }
+  .mini-stat .ms-lbl { font-size: 8px; text-transform: uppercase; letter-spacing: 0.12em; color: #6E6862; margin-bottom: 3px; }
+  .mini-stat .ms-val { font-size: 15px; font-weight: 700; color: #F0EDE8; line-height: 1; }
+  .mini-stat .ms-unit { font-size: 9px; color: #8A8280; }
+  .mini-stat .ms-cmp { font-size: 9px; margin-top: 3px; }
+  .mini-stat .ms-cmp.above { color: #E8445A; }
+  .mini-stat .ms-cmp.below { color: #7DD3A0; }
+  .mini-stat .ms-cmp.avg   { color: #8A8280; }
+
+  /* Comparison bar */
+  .bar-track { position: relative; height: 5px; background: rgba(255,255,255,0.10); border-radius: 999px; margin-bottom: 5px; }
+  .bar-fill {
+    height: 100%; border-radius: 999px;
+    background: linear-gradient(90deg, #7DD3A0 0%, #F5C87A 50%, #E8445A 100%);
+    width: 100%;
+  }
+  .bar-marker {
+    position: absolute; top: 50%; transform: translate(-50%, -50%);
+    width: 14px; height: 14px; border-radius: 99px;
+    background: #E8445A; border: 2px solid #0A0A0F;
+    box-shadow: 0 0 8px rgba(232,68,90,0.65);
+    left: 50%;
+    transition: left 900ms cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .bar-ends { display: flex; justify-content: space-between;
+    font-size: 9px; color: #6E6862; margin-bottom: 14px; }
+
+  /* Result actions */
+  .result-actions {
+    display: flex; gap: 10px;
+  }
+  .btn-ghost {
+    flex: 1; height: 48px; border-radius: 999px;
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12);
+    color: #F0EDE8; font-weight: 500; font-size: 14px;
+    transition: background-color 200ms;
+  }
+  .btn-ghost:hover { background: rgba(255,255,255,0.14); }
+  .btn-primary {
+    flex: 2; height: 48px; border-radius: 999px;
+    background: #E8445A; color: #0A0A0F; font-weight: 700; font-size: 14px;
+    box-shadow: 0 6px 22px rgba(232,68,90,0.32);
+    transition: background-color 200ms, transform 120ms;
+  }
+  .btn-primary:hover { background: #F26478; }
+  .btn-primary:active { transform: scale(0.97); }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Topbar (always visible) -->
+  <div class="topbar">
+    <a href="/scan" class="back-link">← Back</a>
+    <div class="brand-strip"><span class="brand-dot"></span><span>Somatic</span></div>
+  </div>
+
+  <!-- Loading overlay -->
+  <div id="loading-overlay">
+    <div class="loading-ring"></div>
+    <div class="loading-text">Loading hand detection…</div>
+  </div>
+
+  <!-- ──────────── INTRO ──────────── -->
+  <div id="intro-screen" class="hidden">
+    <div class="intro-icon">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#E8445A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+      </svg>
+    </div>
+    <h1 class="intro-title">Your Heart is the Size<br>of Your Fist</h1>
+    <p class="intro-sub">A fact known since Hippocrates. We'll use your camera to measure it.</p>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text">Make a <b>fist</b> with either hand and extend your arm fully</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text">Hold it up to the front camera — <b>fit it inside the oval</b> on screen</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text">Keep steady for 1 second — we'll capture and calculate</div>
+      </div>
+    </div>
+    <button class="cta-btn" id="start-btn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      Start measuring
+    </button>
+    <p class="cal-tip">Uses front camera only · no data leaves your device until you save</p>
+  </div>
+
+  <!-- ──────────── CAMERA / SCAN ──────────── -->
+  <div id="camera-screen" class="hidden">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="guide-canvas"></canvas>
+    <div id="scan-status" class="neutral">Show your closed fist</div>
+    <div id="capture-flash"></div>
+  </div>
+
+  <!-- ──────────── RESULT — AR MODE ──────────── -->
+  <div id="result-screen" class="hidden">
+
+    <!-- Live camera as background -->
+    <video id="ar-video" autoplay playsinline muted></video>
+    <!-- Vignette to make heart pop -->
+    <div id="ar-vignette"></div>
+    <!-- Full-screen Three.js canvas -->
+    <div id="heart-ar-mount"></div>
+    <!-- Dimension labels -->
+    <span class="ar-dim" id="lbl-width"></span>
+    <span class="ar-dim" id="lbl-length"></span>
+    <span class="ar-dim" id="lbl-depth"></span>
+
+    <!-- Bottom glass info panel -->
+    <div class="ar-panel">
+      <div class="ar-panel-handle"></div>
+      <div class="result-tag">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7-4.35-7-10a4.5 4.5 0 0 1 8-2.83A4.5 4.5 0 0 1 21 11c0 5.65-7 10-7 10z"/></svg>
+        Your Heart
+      </div>
+      <div class="result-title" id="result-title">Measuring…</div>
+      <div class="result-sub" id="result-sub">Based on your fist measurement</div>
+
+      <div class="mini-stats">
+        <div class="mini-stat">
+          <div class="ms-lbl">Width</div>
+          <div class="ms-val" id="sv-width">—<span class="ms-unit">cm</span></div>
+          <div class="ms-cmp avg" id="sc-width"></div>
+        </div>
+        <div class="mini-stat">
+          <div class="ms-lbl">Length</div>
+          <div class="ms-val" id="sv-length">—<span class="ms-unit">cm</span></div>
+          <div class="ms-cmp avg" id="sc-length"></div>
+        </div>
+        <div class="mini-stat">
+          <div class="ms-lbl">Depth</div>
+          <div class="ms-val" id="sv-depth">—<span class="ms-unit">cm</span></div>
+          <div class="ms-cmp avg" id="sc-depth"></div>
+        </div>
+        <div class="mini-stat">
+          <div class="ms-lbl">Weight</div>
+          <div class="ms-val" id="sv-weight">—<span class="ms-unit">g</span></div>
+          <div class="ms-cmp avg" id="sc-weight"></div>
+        </div>
+      </div>
+
+      <div class="bar-track">
+        <div class="bar-fill"></div>
+        <div class="bar-marker" id="bar-marker"></div>
+      </div>
+      <div class="bar-ends"><span>Smaller</span><span>Average</span><span>Larger</span></div>
+
+      <p id="heart-fact" style="font-size:12px;color:#8A8280;line-height:1.5;margin:10px 0 14px;"></p>
+
+      <div class="result-actions">
+        <button class="btn-ghost" id="btn-retake">Retake</button>
+        <button class="btn-primary" id="btn-save">Save to profile</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+// ────────────────────────────────────────────────
+// Constants
+// ────────────────────────────────────────────────
+const AVG_FIST_CM      = 8.5;
+const AVG_HEART_W      = 9.0;   // width cm
+const AVG_HEART_L      = 12.0;  // length cm
+const AVG_HEART_D      = 6.5;   // depth cm
+const AVG_HEART_WEIGHT = 280;   // grams
+
+// Fist should occupy this fraction of canvas width at the guide distance
+const GUIDE_FRAC   = 0.26;
+// Acceptable fill ratio range (fist px / guide px)
+const FILL_MIN     = 0.50;
+const FILL_MAX     = 1.65;
+// Frames the fist must stay in position (~0.4s at ~20fps)
+const STABLE_NEED  = 8;
+// How many consecutive bad frames are forgiven before resetting the count
+const MISS_GRACE   = 6;
+
+const FACTS = [
+  "Your heart beats ~100,000 times a day and pumps about 2,000 gallons of blood.",
+  "The left ventricle wall is three times thicker than the right — it pumps to your whole body.",
+  "A healthy heart creates enough daily energy to drive a truck 20 miles.",
+  "Heart cells have almost no ability to regenerate — why consistent HRV care matters so much.",
+  "Your heart starts beating just 22 days after conception, long before the brain forms.",
+  "The average heart pumps blood through 60,000 miles of blood vessels.",
+];
+
+// ────────────────────────────────────────────────
+// DOM
+// ────────────────────────────────────────────────
+const $   = id => document.getElementById(id);
+const set = (id, html, isText = false) => {
+  const el = $(id);
+  if (!el) { console.warn('Missing element #' + id); return; }
+  if (isText) el.textContent = html; else el.innerHTML = html;
+};
+const loading    = $('loading-overlay');
+const introScr   = $('intro-screen');
+const camScr     = $('camera-screen');
+const resultScr  = $('result-screen');
+const video      = $('video');
+const overlay    = $('guide-canvas');
+const ctx        = overlay.getContext('2d');
+const statusEl   = $('scan-status');
+const flash      = $('capture-flash');
+
+// ────────────────────────────────────────────────
+// State
+// ────────────────────────────────────────────────
+let scanning       = false;
+let stableFrames   = 0;
+let missFrames     = 0;
+let capturedPx     = null;
+let lastGoodPx     = null;
+let stream         = null;
+let handsModel     = null;
+let animId         = null;
+let busy           = false;
+
+// ────────────────────────────────────────────────
+// Helpers
+// ────────────────────────────────────────────────
+function show(el) { el.classList.remove('hidden'); }
+function hide(el) { el.classList.add('hidden'); }
+
+function setStatus(txt, type = 'neutral') {
+  statusEl.textContent = txt;
+  statusEl.className   = type;
+}
+
+// ── Fist geometry from MediaPipe landmarks (normalized 0–1) ──
+function isFist(lm) {
+  // Finger tip y > PIP y means finger is curled (y=0 is top of frame)
+  return [
+    lm[8].y  > lm[6].y,   // index
+    lm[12].y > lm[10].y,  // middle
+    lm[16].y > lm[14].y,  // ring
+    lm[20].y > lm[18].y,  // pinky
+  ].filter(Boolean).length >= 3;
+}
+
+function fistBounds(lm, W, H) {
+  let x0=1, x1=0, y0=1, y1=0;
+  for (const p of lm) {
+    if (p.x < x0) x0 = p.x; if (p.x > x1) x1 = p.x;
+    if (p.y < y0) y0 = p.y; if (p.y > y1) y1 = p.y;
+  }
+  // Add a small padding (5% on each side)
+  const padX = (x1 - x0) * 0.08;
+  const padY = (y1 - y0) * 0.08;
+  return {
+    x: (x0 - padX) * W, y: (y0 - padY) * H,
+    w: (x1 - x0 + 2*padX) * W,
+    h: (y1 - y0 + 2*padY) * H,
+  };
+}
+
+// ────────────────────────────────────────────────
+// Canvas / guide drawing
+// ────────────────────────────────────────────────
+function syncCanvas() {
+  overlay.width  = camScr.clientWidth  || window.innerWidth;
+  overlay.height = camScr.clientHeight || window.innerHeight;
+}
+
+function drawFrame(bbox, state) {
+  // state: 'idle' | 'warn' | 'good'
+  ctx.clearRect(0, 0, overlay.width, overlay.height);
+  const W = overlay.width, H = overlay.height;
+
+  const cx = W * 0.5;
+  const cy = H * 0.44;
+  const rx = W * GUIDE_FRAC * 0.5;
+  const ry = rx * 1.32;
+
+  // ── Oval shadow / depth ──
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx + 6, ry + 6, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  ctx.fill();
+  ctx.restore();
+
+  // ── Oval fill ──
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fillStyle = state === 'good'
+    ? 'rgba(125,211,160,0.07)'
+    : 'rgba(232,68,90,0.05)';
+  ctx.fill();
+
+  // ── Oval stroke ──
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+  if (state === 'good') {
+    ctx.strokeStyle = 'rgba(125,211,160,0.85)';
+    ctx.setLineDash([]);
+    ctx.lineWidth = 3;
+  } else if (state === 'warn') {
+    ctx.strokeStyle = 'rgba(245,200,122,0.7)';
+    ctx.setLineDash([10, 7]);
+    ctx.lineWidth = 2;
+  } else {
+    ctx.strokeStyle = 'rgba(232,68,90,0.55)';
+    ctx.setLineDash([10, 7]);
+    ctx.lineWidth = 2;
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // ── Oval label ──
+  ctx.font = '500 12px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  if (state === 'good') {
+    ctx.fillStyle = 'rgba(125,211,160,0.90)';
+    ctx.fillText('✓ Perfect — hold still', cx, cy + ry + 12);
+  } else {
+    ctx.fillStyle = 'rgba(232,68,90,0.75)';
+    ctx.fillText('Fit your fist inside the oval', cx, cy + ry + 12);
+  }
+
+  // ── Fist bounding box ──
+  if (bbox) {
+    const col = state === 'good' ? 'rgba(125,211,160,0.7)' : 'rgba(245,200,122,0.55)';
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(bbox.x, bbox.y, bbox.w, bbox.h, 10);
+    else ctx.rect(bbox.x, bbox.y, bbox.w, bbox.h);
+    ctx.strokeStyle = col;
+    ctx.lineWidth   = 2;
+    ctx.stroke();
+  }
+}
+
+// ────────────────────────────────────────────────
+// MediaPipe results
+// ────────────────────────────────────────────────
+function onResults(results) {
+  if (!scanning) return;
+
+  const W = overlay.width, H = overlay.height;
+  const guideW = W * GUIDE_FRAC;
+
+  if (!results.multiHandLandmarks?.length) {
+    // No hand — use grace window before resetting
+    missFrames++;
+    if (missFrames > MISS_GRACE) {
+      drawFrame(null, 'idle');
+      setStatus('Make a fist and hold it up', 'neutral');
+      stableFrames = 0;
+    }
+    return;
+  }
+
+  const lm = results.multiHandLandmarks[0];
+
+  if (!isFist(lm)) {
+    missFrames++;
+    if (missFrames > MISS_GRACE) {
+      drawFrame(fistBounds(lm, W, H), 'idle');
+      setStatus('Close all fingers into a fist', 'neutral');
+      stableFrames = 0;
+    }
+    return;
+  }
+
+  const bb    = fistBounds(lm, W, H);
+  const ratio = bb.w / guideW;
+
+  if (ratio < FILL_MIN) {
+    missFrames++;
+    if (missFrames > MISS_GRACE) {
+      drawFrame(bb, 'warn');
+      setStatus('Move closer →', 'warn');
+      stableFrames = 0;
+    }
+    return;
+  }
+  if (ratio > FILL_MAX) {
+    missFrames++;
+    if (missFrames > MISS_GRACE) {
+      drawFrame(bb, 'warn');
+      setStatus('← Move further away', 'warn');
+      stableFrames = 0;
+    }
+    return;
+  }
+
+  // ── Fist is in the zone ──
+  missFrames = 0;
+  stableFrames++;
+  lastGoodPx = bb.w; // always save the latest valid measurement
+  drawFrame(bb, 'good');
+
+  const pct = Math.min(99, Math.round((stableFrames / STABLE_NEED) * 100));
+  if (stableFrames < STABLE_NEED) {
+    setStatus(`Hold still… ${pct}%`, 'good');
+    return;
+  }
+
+  // ── CAPTURE ──
+  capturedPx = lastGoodPx;
+  scanning   = false;
+  doCapture();
+}
+
+// ────────────────────────────────────────────────
+// Camera
+// ────────────────────────────────────────────────
+async function startCamera() {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    setStatus('Camera not supported in this browser', 'warn');
+    return false;
+  }
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24 } },
+    });
+  } catch {
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: true }); }
+    catch (err) {
+      const denied = err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError';
+      setStatus(denied ? 'Allow camera access and tap retry' : 'Camera unavailable — tap to retry', 'warn');
+      return false;
+    }
+  }
+  video.srcObject = stream;
+  await new Promise(r => { video.readyState >= 2 ? r() : (video.onloadedmetadata = r); });
+  await video.play().catch(() => {});
+  return true;
+}
+
+function stopCamera() {
+  if (animId) { cancelAnimationFrame(animId); animId = null; }
+  stream?.getTracks().forEach(t => t.stop());
+  stream = null; busy = false;
+  const arVid = $('ar-video');
+  if (arVid) arVid.srcObject = null;
+}
+
+function startLoop() {
+  async function tick() {
+    if (scanning && !busy && handsModel && video.readyState >= 2) {
+      busy = true;
+      try { await handsModel.send({ image: video }); } catch {}
+      busy = false;
+    }
+    animId = requestAnimationFrame(tick);
+  }
+  animId = requestAnimationFrame(tick);
+}
+
+// ────────────────────────────────────────────────
+// Capture & transition
+// ────────────────────────────────────────────────
+function doCapture() {
+  flash.classList.add('flash');
+  setTimeout(() => flash.classList.remove('flash'), 200);
+  setTimeout(() => {
+    // Stop the hand-tracking loop but KEEP the camera stream for the AR background
+    if (animId) { cancelAnimationFrame(animId); animId = null; }
+    scanning = false;
+    showResult();
+  }, 350);
+}
+
+// ────────────────────────────────────────────────
+// Size calculation
+// ────────────────────────────────────────────────
+function calcSize(fistPx) {
+  const idealPx = overlay.width * GUIDE_FRAC;
+  const fistCm  = (fistPx / idealPx) * AVG_FIST_CM;
+
+  return {
+    width:  +fistCm.toFixed(1),
+    length: +(fistCm * AVG_HEART_L / AVG_FIST_CM).toFixed(1),
+    depth:  +(fistCm * AVG_HEART_D / AVG_FIST_CM).toFixed(1),
+    weight: Math.round(AVG_HEART_WEIGHT * Math.pow(fistCm / AVG_FIST_CM, 3)),
+    ratio:  fistCm / AVG_FIST_CM,
+  };
+}
+
+function cmpText(ratio) {
+  if (ratio > 1.12) return { text: '↑ Above average',  cls: 'above' };
+  if (ratio < 0.88) return { text: '↓ Below average',  cls: 'below' };
+  return               { text: 'About average',         cls: 'avg'   };
+}
+
+// ────────────────────────────────────────────────
+// Show result
+// ────────────────────────────────────────────────
+function showResult() {
+  const s   = calcSize(capturedPx);
+  const cmp = cmpText(s.ratio);
+
+  // Title
+  const titleText = s.ratio > 1.12 ? 'A Big, Powerful Heart'
+                  : s.ratio < 0.88 ? 'A Compact, Efficient Heart'
+                  : 'A Perfectly Average Heart';
+  set('result-title', titleText, true);
+  set('result-sub', `${s.width} × ${s.length} × ${s.depth} cm · ~${s.weight} g`, true);
+
+  // AR dimension labels
+  set('lbl-width',  `↔ ${s.width} cm`,  true);
+  set('lbl-length', `↕ ${s.length} cm`, true);
+  set('lbl-depth',  `⊙ ${s.depth} cm`,  true);
+
+  // Stat cards
+  [
+    ['sv-width',  'sc-width',  s.width,  'cm'],
+    ['sv-length', 'sc-length', s.length, 'cm'],
+    ['sv-depth',  'sc-depth',  s.depth,  'cm'],
+    ['sv-weight', 'sc-weight', s.weight, 'g' ],
+  ].forEach(([vid, cid, val, unit]) => {
+    set(vid, `${val}<span class="ms-unit">${unit}</span>`);
+    const el = $(cid);
+    if (el) { el.textContent = cmp.text; el.className = `ms-cmp ${cmp.cls}`; }
+  });
+
+  // Comparison bar: map ratio 0.70–1.30 → 5%–95%
+  const barPct = Math.min(95, Math.max(5, ((s.ratio - 0.70) / 0.60) * 90 + 5));
+  setTimeout(() => { const m = $('bar-marker'); if (m) m.style.left = barPct + '%'; }, 120);
+
+  // Random fact
+  set('heart-fact', FACTS[Math.floor(Math.random() * FACTS.length)], true);
+
+  // Persist to localStorage
+  try {
+    localStorage.setItem('somatic.heartSize', JSON.stringify({
+      width: s.width, length: s.length, depth: s.depth, weight: s.weight,
+      measuredAt: new Date().toISOString(),
+    }));
+  } catch {}
+
+  // Pipe live camera stream to AR background video
+  const arVid = $('ar-video');
+  if (arVid && stream) {
+    arVid.srcObject = stream;
+    arVid.play().catch(() => {});
+  }
+
+  hide(camScr);
+  show(resultScr);
+  setup3D(s.ratio);
+}
+
+// ────────────────────────────────────────────────
+// 3D Heart — AR result (full-screen, no rotation, gyro parallax)
+// ────────────────────────────────────────────────
+let scene3, cam3, ren3, hGrp, raf3;
+let gyroX = 0, gyroY = 0; // smoothed device orientation offsets
+
+function setup3D(sizeRatio) {
+  const mount = $('heart-ar-mount');
+  if (!mount || ren3) return;
+
+  const W = window.innerWidth, H = window.innerHeight;
+  // Heart sits in the upper-center of the screen (above the panel)
+  // Camera FOV tuned so heart fills ~30% of screen height
+  scene3 = new THREE.Scene();
+  const aspect = W / H;
+  cam3 = new THREE.PerspectiveCamera(40, aspect, 0.1, 100);
+  cam3.position.set(0, 0, 4.8);
+
+  ren3 = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  ren3.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  ren3.setSize(W, H, false);
+  ren3.outputColorSpace = THREE.SRGBColorSpace;
+  ren3.setClearColor(0x000000, 0); // fully transparent background
+  mount.appendChild(ren3.domElement);
+
+  // Lighting — bright warm key from above-front, golden rim, soft fill
+  scene3.add(new THREE.AmbientLight(0xffffff, 0.6));
+  const key = new THREE.DirectionalLight(0xffa0b0, 3.0); key.position.set(1.5, 3, 3); scene3.add(key);
+  const rim = new THREE.DirectionalLight(0xf5c87a, 0.8); rim.position.set(-2, -1, 1.5); scene3.add(rim);
+  const fill= new THREE.DirectionalLight(0xaabbff, 0.3); fill.position.set(0, 0, -2); scene3.add(fill);
+
+  // Aura glow sprite — soft rose radial gradient
+  const ac = document.createElement('canvas'); ac.width = ac.height = 256;
+  const ax = ac.getContext('2d');
+  const ag = ax.createRadialGradient(128,128,6, 128,128,128);
+  ag.addColorStop(0,'#e8445acc'); ag.addColorStop(0.4,'#e8445a55'); ag.addColorStop(1,'#e8445a00');
+  ax.fillStyle = ag; ax.fillRect(0,0,256,256);
+  const aura = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: new THREE.CanvasTexture(ac), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  }));
+  aura.scale.set(6, 6, 1);
+  // Position heart in upper ~40% of the viewport
+  aura.position.set(0, 0.3, -0.5);
+  scene3.add(aura);
+
+  // Heart group — positioned in upper-center of viewport, scaled to ratio
+  hGrp = new THREE.Group();
+  hGrp.position.set(0, 0.3, 0); // lift slightly above center
+  hGrp.scale.setScalar(sizeRatio);
+  scene3.add(hGrp);
+
+  // Fallback procedural heart (shown until GLB loads)
+  const hs = new THREE.Shape();
+  hs.moveTo(.5,.5); hs.bezierCurveTo(.5,.5,.4,0,0,0);
+  hs.bezierCurveTo(-.6,0,-.6,.7,-.6,.7); hs.bezierCurveTo(-.6,1.1,-.3,1.54,.5,1.9);
+  hs.bezierCurveTo(1.2,1.54,1.6,1.1,1.6,.7); hs.bezierCurveTo(1.6,.7,1.6,0,1,0);
+  hs.bezierCurveTo(.7,0,.5,.5,.5,.5);
+  const eg = new THREE.ExtrudeGeometry(hs, { depth:.4,bevelEnabled:true,bevelSegments:4,steps:2,bevelSize:.12,bevelThickness:.12 });
+  eg.translate(-.5,-1,0); eg.scale(.65,.65,.65); eg.rotateZ(Math.PI);
+  const fb = new THREE.Mesh(eg, new THREE.MeshStandardMaterial({
+    color:0xff5c6f, roughness:.25, metalness:.25, emissive:0x330008, emissiveIntensity:.5
+  }));
+  hGrp.add(fb);
+
+  // Load GLB model
+  new GLTFLoader().load('/models/beating_heart.glb', gltf => {
+    const root = gltf.scene;
+    root.traverse(c => {
+      const n = (c.name||'').toLowerCase();
+      if (['hr','hrv','bpm','text','label','display','sitting','beat','high','low','brady','tachy','normal'].some(k=>n.includes(k))) c.visible=false;
+    });
+    const bb  = new THREE.Box3().setFromObject(root);
+    const bsz = bb.getSize(new THREE.Vector3());
+    root.scale.setScalar(1.6 / Math.max(bsz.x, bsz.y, bsz.z));
+    bb.setFromObject(root);
+    root.position.sub(bb.getCenter(new THREE.Vector3()));
+    hGrp.remove(fb);
+    hGrp.add(root);
+  });
+
+  // ── Device orientation: gyroscope parallax (makes heart feel anchored in space) ──
+  const setupGyro = () => {
+    window.addEventListener('deviceorientation', e => {
+      // gamma = left/right tilt (-90 to 90), beta = fwd/back tilt (0 to 180)
+      const targetX = THREE.MathUtils.clamp((e.beta  - 60) / 60, -1, 1) * 0.4;
+      const targetY = THREE.MathUtils.clamp( e.gamma       / 60, -1, 1) * 0.25;
+      // Smooth with lerp factor
+      gyroX += (targetX - gyroX) * 0.06;
+      gyroY += (targetY - gyroY) * 0.06;
+    }, { passive: true });
+  };
+
+  // iOS 13+ requires permission for DeviceOrientationEvent
+  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+    // We'll request on the first user tap (already inside a result screen user gesture)
+    DeviceOrientationEvent.requestPermission().then(s => { if (s === 'granted') setupGyro(); }).catch(() => {});
+  } else {
+    setupGyro();
+  }
+
+  // ── Animate: heartbeat pulse only, no rotation ──
+  let t3 = 0;
+  function animate3() {
+    raf3 = requestAnimationFrame(animate3);
+    t3  += 0.016;
+
+    // Heartbeat pulse — two-beat rhythm like a real cardiac cycle
+    const phase = (t3 * 1.1) % (Math.PI * 2);
+    const beat  = Math.max(0, Math.sin(phase) * 0.6 + Math.sin(phase * 2) * 0.3);
+    const pulse = 1 + beat * 0.07;
+    hGrp.scale.setScalar(sizeRatio * pulse);
+
+    // Aura breathes with pulse
+    aura.material.opacity = 0.40 + beat * 0.40;
+
+    // Gyroscope parallax: shift heart group position to simulate being anchored in real space
+    hGrp.position.x = THREE.MathUtils.lerp(hGrp.position.x, -gyroY * 1.2, 0.1);
+    hGrp.position.y = THREE.MathUtils.lerp(hGrp.position.y,  0.3 + gyroX * 0.8, 0.1);
+    aura.position.x = hGrp.position.x;
+    aura.position.y = hGrp.position.y;
+
+    // Very subtle idle sway (if no gyro)
+    if (gyroX === 0 && gyroY === 0) {
+      hGrp.position.y = 0.3 + Math.sin(t3 * 0.5) * 0.04;
+    }
+
+    ren3.render(scene3, cam3);
+  }
+  animate3();
+
+  // Resize handler for AR canvas
+  window.addEventListener('resize', () => {
+    if (!ren3) return;
+    const nW = window.innerWidth, nH = window.innerHeight;
+    cam3.aspect = nW / nH;
+    cam3.updateProjectionMatrix();
+    ren3.setSize(nW, nH, false);
+  });
+}
+
+// ────────────────────────────────────────────────
+// Button wiring
+// ────────────────────────────────────────────────
+$('start-btn').addEventListener('click', async () => {
+  hide(introScr);
+  show(camScr);
+  syncCanvas();
+  stableFrames = 0; missFrames = 0; capturedPx = null; lastGoodPx = null; scanning = false;
+
+  const ok = await startCamera();
+  if (!ok) {
+    // Allow retry by clicking status pill
+    statusEl.style.cursor = 'pointer';
+    statusEl.addEventListener('click', async () => {
+      const r = await startCamera();
+      if (r) { statusEl.style.cursor = ''; scanning = true; startLoop(); }
+    }, { once: true });
+    return;
+  }
+  scanning = true;
+  startLoop();
+});
+
+$('btn-retake').addEventListener('click', () => {
+  // Tear down AR 3D scene
+  if (raf3) { cancelAnimationFrame(raf3); raf3 = null; }
+  if (ren3) { ren3.dispose(); ren3 = null; hGrp = null; }
+  $('heart-ar-mount').querySelector('canvas')?.remove();
+
+  // Stop existing camera stream fully before restarting
+  stopCamera();
+
+  hide(resultScr);
+  show(camScr);
+  syncCanvas();
+  stableFrames = 0; missFrames = 0; capturedPx = null; lastGoodPx = null; busy = false;
+
+  startCamera().then(ok => {
+    if (ok) { scanning = true; startLoop(); }
+  });
+});
+
+$('btn-save').addEventListener('click', () => {
+  $('btn-save').textContent = 'Saved ✓';
+  $('btn-save').disabled = true;
+  // POST to API if available
+  const raw = localStorage.getItem('somatic.heartSize');
+  const data = raw ? JSON.parse(raw) : null;
+  if (data) {
+    const key = (() => { try { return localStorage.getItem('somatic.apiKey')||''; } catch { return ''; }})();
+    const hdrs = { 'Content-Type': 'application/json' };
+    if (key) hdrs['X-API-Key'] = key;
+    fetch('/api/heart-size', { method: 'POST', headers: hdrs, body: JSON.stringify(data) }).catch(()=>{});
+  }
+  setTimeout(() => { window.location.href = '/insights'; }, 900);
+});
+
+window.addEventListener('beforeunload', () => {
+  stopCamera();
+  if (raf3) cancelAnimationFrame(raf3);
+});
+window.addEventListener('resize', () => { if (!camScr.classList.contains('hidden')) syncCanvas(); });
+
+// ────────────────────────────────────────────────
+// Boot — load MediaPipe, then show intro
+// ────────────────────────────────────────────────
+(async function boot() {
+  // Wait up to 8 seconds for MediaPipe Hands to define itself
+  for (let i = 0; i < 80 && !window.Hands; i++) {
+    await new Promise(r => setTimeout(r, 100));
+  }
+
+  if (!window.Hands) {
+    $('loading-overlay').querySelector('.loading-text').textContent =
+      'Hand detection failed to load. Check your connection and refresh.';
+    return;
+  }
+
+  handsModel = new window.Hands({
+    locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`,
+  });
+  handsModel.setOptions({
+    maxNumHands:             1,
+    modelComplexity:         0,   // 0 = Lite, faster on mobile
+    minDetectionConfidence:  0.65,
+    minTrackingConfidence:   0.5,
+  });
+  handsModel.onResults(onResults);
+
+  try { await handsModel.initialize(); } catch {}
+
+  hide(loading);
+  show(introScr);
+})();
+</script>
+</body>
+</html>

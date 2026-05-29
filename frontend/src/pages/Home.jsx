@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import BeatingHeart3D from "@/components/BeatingHeart3D";
 import { getAffirmationToday, getStreak, listSnapshots, logPractice } from "@/lib/api";
 import { getProfile, getLatestBpm, getLatestHrv, nervousSystemState, timeAwareGreeting } from "@/lib/wellness";
 import { Heart, Activity, Flame, ChevronRight, Sparkles, BookOpen } from "lucide-react";
@@ -42,12 +41,17 @@ export default function Home() {
           aria-label="Tap to begin scan"
           data-testid="home-heart-tap"
         >
-          <BeatingHeart3D bpm={bpm} hrv={hrv || 30} size={220} />
+          {/* Minimal pulse ring — heart model reserved for post-scan */}
+          <div className="relative flex items-center justify-center" style={{ width: 220, height: 220 }}>
+            <div className="absolute inset-0 rounded-full" style={{ background: "radial-gradient(circle, rgba(232,68,90,0.10) 0%, transparent 70%)" }} />
+            <div className="absolute rounded-full border border-[#E8445A]/20" style={{ width: 140, height: 140, animation: "pulse-ring 2.4s ease-out infinite" }} />
+            <div className="absolute rounded-full border border-[#E8445A]/10" style={{ width: 180, height: 180, animation: "pulse-ring 2.4s ease-out 0.6s infinite" }} />
+            <div className="flex flex-col items-center justify-center gap-1">
+              <div className="display text-6xl font-semibold tracking-tight leading-none text-[#F0EDE8]" data-testid="home-bpm">{bpm}</div>
+              <div className="text-[11px] uppercase tracking-wider text-[#8A8280]">bpm · tap to scan</div>
+            </div>
+          </div>
         </button>
-        <div className="mt-4 text-center">
-          <div className="display text-5xl font-semibold tracking-tight leading-none" data-testid="home-bpm">{bpm}</div>
-          <div className="mt-1 text-[11px] uppercase tracking-wider text-[#8A8280]">bpm · tap to scan</div>
-        </div>
       </div>
 
       <div className="mt-6 flex gap-3 overflow-x-auto no-scrollbar -mx-5 px-5" data-testid="home-cards-strip">
