@@ -3,7 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { getProfile, setProfile, clearProfile } from "@/lib/wellness";
 import { notifyMe } from "@/lib/api";
 import { toast } from "sonner";
-import { Bell, Stethoscope, Lock, LogOut, Heart, ShieldCheck, ChevronRight, BellRing } from "lucide-react";
+import { Bell, Stethoscope, Lock, LogOut, Heart, ShieldCheck, ChevronRight, BellRing, Smartphone } from "lucide-react";
+import { AnimatePresence } from "framer-motion";
+import { useInstall } from "@/lib/useInstall";
+import IosInstallOverlay from "@/components/IosInstallOverlay";
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -13,6 +16,8 @@ export default function Profile() {
   const [reminders, setReminders] = useState(p.reminders !== false);
   const [affDaily, setAffDaily] = useState(p.affDaily !== false);
   const [email, setEmail] = useState("");
+  const [showIosSheet, setShowIosSheet] = useState(false);
+  const { canInstall, isIos, isInstalled, install, clearDismissed } = useInstall();
 
   const save = () => {
     setProfile({ ...p, name: name.trim() || null, scanPref, reminders, affDaily });
@@ -54,6 +59,49 @@ export default function Profile() {
 
         <button onClick={save} className="mt-5 w-full h-11 rounded-xl bg-[#E8445A] text-[#0A0A0F] font-semibold hover:bg-[#F26478]" data-testid="profile-save">Save preferences</button>
       </div>
+
+      {/* Add to Home Screen — shown unless already installed */}
+      {!isInstalled && (
+        <div className="mt-5 rounded-2xl bg-[#13131A] border border-[#1F1F2E] p-4" data-testid="profile-install-row">
+          <button
+            className="w-full flex items-center gap-3 text-left"
+            onClick={async () => {
+              if (isIos) {
+                setShowIosSheet(true);
+              } else if (canInstall) {
+                clearDismissed();
+                const accepted = await install();
+                if (accepted) toast.success("Somatic added to your home screen 🎉");
+              } else {
+                // Prompt was already used or browser doesn't support it
+                toast("Open this page in Chrome or Safari and use the browser menu → Add to Home Screen", { duration: 5000 });
+              }
+            }}
+          >
+            <span className="w-10 h-10 rounded-xl bg-[#1A1118] border border-[#E8445A]/30 grid place-items-center flex-shrink-0">
+              <Smartphone className="w-4.5 h-4.5 text-[#E8445A]" />
+            </span>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium text-[#F0EDE8]">Add to Home Screen</div>
+              <div className="text-[11px] text-[#8A8280] mt-0.5">
+                {isIos
+                  ? "Works offline · instant access from your home screen"
+                  : canInstall
+                    ? "Install as an app — no App Store needed"
+                    : "Open in Chrome or Safari to install"}
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-[#8A8280] flex-shrink-0" />
+          </button>
+        </div>
+      )}
+
+      {/* iOS full-screen install overlay */}
+      <AnimatePresence>
+        {showIosSheet && (
+          <IosInstallOverlay onClose={() => setShowIosSheet(false)} />
+        )}
+      </AnimatePresence>
 
       {/* Locked features */}
       <div className="mt-5 rounded-2xl bg-[#0F0F16] border border-[#1F1F2E] p-5" data-testid="profile-locked-section">

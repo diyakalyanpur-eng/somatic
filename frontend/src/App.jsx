@@ -14,6 +14,10 @@ import HealthProfile from "@/pages/HealthProfile";
 import HealthReport from "@/pages/HealthReport";
 import OnboardingGate from "@/components/OnboardingGate";
 import InstallPrompt from "@/components/InstallPrompt";
+import { initInstallCapture } from "@/lib/useInstall";
+
+// Capture the beforeinstallprompt event as early as possible
+initInstallCapture();
 
 function App() {
   return (
