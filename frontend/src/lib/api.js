@@ -10,6 +10,9 @@ const defaultHeaders = {};
 const apiKey = import.meta.env.VITE_API_KEY;
 if (apiKey) {
   defaultHeaders["X-API-Key"] = apiKey;
+  // Also cache in localStorage so standalone HTML pages (aisteth.html, heartsize.html)
+  // can read it at runtime — they can't access Vite's import.meta.env.
+  try { localStorage.setItem("somatic.apiKey", apiKey); } catch {}
 }
 
 export const http = axios.create({ baseURL: API, timeout: 30000, headers: defaultHeaders });

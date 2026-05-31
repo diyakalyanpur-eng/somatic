@@ -119,13 +119,6 @@
   .cal-mark svg { width: 28px; height: 28px; color: #E8445A; }
   .cal-title { font-family: 'Playfair Display', serif; font-size: 26px; font-weight: 500; letter-spacing: -0.01em; line-height: 1.2; text-align: center; }
   .cal-sub { font-size: 14px; color: #8A8280; text-align: center; max-width: 340px; line-height: 1.55; }
-  .mode-pills { display: flex; gap: 8px; padding: 4px; background: rgba(19,19,26,0.9); border: 1px solid #1F1F2E; border-radius: 999px; }
-  .mode-pill {
-    padding: 9px 18px; border-radius: 999px; font-size: 13px; font-weight: 500; color: #8A8280;
-    transition: background-color 200ms, color 200ms;
-  }
-  .mode-pill.active { background: rgba(232,68,90,0.15); color: #E8445A; }
-
   .start-btn {
     display: inline-flex; align-items: center; justify-content: center; gap: 8px;
     height: 52px; padding: 0 28px; min-width: 220px;
@@ -205,6 +198,29 @@
     font-size: 10px; color: #8A8280; text-transform: uppercase; letter-spacing: 0.18em;
     padding: 4px 12px; background: rgba(19,19,26,0.7); border: 1px solid #1F1F2E; border-radius: 999px;
   }
+
+  /* Phase step indicator (replaces mode pills) */
+  .phase-steps { display: flex; align-items: center; gap: 0; padding: 4px 16px; background: rgba(19,19,26,0.9); border: 1px solid #1F1F2E; border-radius: 999px; }
+  .phase-step { display: flex; align-items: center; gap: 6px; padding: 8px 12px; font-size: 13px; font-weight: 500; color: #6E6862; transition: color 200ms; pointer-events: none; }
+  .phase-step.active { color: #E8445A; }
+  .phase-step.done { color: #7DD3A0; }
+  .step-dot { width: 7px; height: 7px; border-radius: 99px; background: currentColor; flex-shrink: 0; transition: background-color 200ms; }
+  .step-connector { width: 24px; height: 1px; background: #2A2A3A; flex-shrink: 0; }
+
+  /* Phase transition overlay (between face → finger) */
+  #phase-transition {
+    position: fixed; inset: 0; z-index: 50;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 28px; gap: 22px; text-align: center;
+    background: radial-gradient(circle at 50% 30%, #1A1118 0%, #0A0A0F 70%);
+  }
+  #phase-transition.hidden { display: none; }
+  .pt-icon { width: 64px; height: 64px; border-radius: 20px; background: linear-gradient(180deg, rgba(232,68,90,0.20), rgba(232,68,90,0.05)); border: 1px solid rgba(232,68,90,0.45); display: grid; place-items: center; }
+  .pt-icon svg { width: 32px; height: 32px; color: #E8445A; }
+  .pt-title { font-family: 'Playfair Display', serif; font-size: 26px; font-weight: 500; line-height: 1.2; }
+  .pt-sub { font-size: 14px; color: #8A8280; max-width: 300px; line-height: 1.65; }
+  .pt-countdown { font-size: 12px; color: #6E6862; padding: 6px 16px; background: rgba(19,19,26,0.7); border: 1px solid #1F1F2E; border-radius: 999px; }
 </style>
 </head>
 <body>
@@ -233,19 +249,43 @@
       <div class="cal-title" id="cal-title">Listening to your heart</div>
       <div class="cal-sub" id="cal-sub">Hold still. Keep your face gently in the frame. This is a wellness signal, not a diagnosis.</div>
     </div>
-    <div class="mode-pills" id="mode-pills" role="tablist" aria-label="Scan mode">
-      <button class="mode-pill active" data-mode="face" id="mode-face" role="tab" data-testid="scan-mode-face">Face</button>
-      <button class="mode-pill" data-mode="finger" id="mode-finger" role="tab" data-testid="scan-mode-finger">Finger</button>
+    <div class="phase-steps" id="phase-steps">
+      <div class="phase-step active" id="step-face">
+        <div class="step-dot"></div>
+        <span>Face</span>
+      </div>
+      <div class="step-connector"></div>
+      <div class="phase-step" id="step-finger">
+        <div class="step-dot"></div>
+        <span>Finger</span>
+      </div>
     </div>
     <button id="start-btn" class="start-btn" data-testid="scan-start-btn" disabled>
       <span id="start-btn-label">Preparing camera…</span>
     </button>
-    <div class="cal-tip" id="cal-tip">About 30 seconds. The heart will glow with your pulse.</div>
+    <div class="cal-tip" id="cal-tip">Two phases · ~40 seconds · face then fingertip</div>
+  </div>
+
+  <!-- Phase transition overlay (face → finger) -->
+  <div id="phase-transition" class="hidden">
+    <div class="pt-icon">
+      <!-- Hand / fingertip icon -->
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 11V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2v0"/>
+        <path d="M14 10V4a2 2 0 0 0-2-2 2 2 0 0 0-2 2v0"/>
+        <path d="M10 10.5V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2v0"/>
+        <path d="M6 14a4 4 0 0 0 4 4h4a4 4 0 0 0 4-4V11"/>
+        <path d="M6 10V9"/>
+      </svg>
+    </div>
+    <div class="pt-title">Phase 1 complete ✓</div>
+    <div class="pt-sub">Now place your <strong>fingertip over the rear camera lens</strong>, covering it fully.</div>
+    <div class="pt-countdown" id="pt-count">Starting in 3…</div>
   </div>
 
   <!-- Status pill (during scan) -->
   <div id="status-bar" class="hidden">Measuring…</div>
-  <div id="mode-tag" class="mode-tag hidden">Face · rPPG</div>
+  <div id="mode-tag" class="mode-tag hidden">Phase 1 · Face · rPPG</div>
 
   <!-- Countdown ring (during scan) -->
   <div id="countdown-overlay">
@@ -255,7 +295,7 @@
         <circle id="ring-fg" class="ring-fg" cx="150" cy="150" r="140" />
       </svg>
       <div class="ring-inner">
-        <div class="ring-num" id="ring-num">30</div>
+        <div class="ring-num" id="ring-num">20</div>
         <div class="ring-label">seconds</div>
       </div>
     </div>

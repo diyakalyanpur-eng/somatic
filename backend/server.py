@@ -235,22 +235,34 @@ async def get_assessment(aid: str) -> Dict[str, Any]:
 @api.post("/snapshot")
 async def save_snapshot(request: Request) -> Dict[str, Any]:
     body = await request.json()
-    if not body.get("fused"):
+    fused = body.get("fused") or {}
+    if not fused:
         raise HTTPException(status_code=400, detail="Missing fused result")
     record = {
         "id": str(uuid.uuid4()),
         "created_at": now_iso(),
+        "mode": body.get("mode"),            # 'face' | 'finger' | 'dual'
+        "deviceType": body.get("deviceType"),
+        "durationSec": body.get("durationSec"),
         "assessmentId": body.get("assessmentId"),
         "patientId": body.get("patientId"),
-        "fused": body.get("fused"),
+        "fused": fused,
         "face": body.get("face"),
         "finger": body.get("finger"),
     }
-    await snapshots_col.insert_one(dict(record))
-    fused = record["fused"] or {}
+    try:
+        await snapshots_col.insert_one(dict(record))
+    except Exception as exc:
+        logger.exception(
+            "snapshot insert_one failed id=%s: %s", record["id"][:8], exc
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Database write failed: {type(exc).__name__}: {exc}",
+        )
     logger.info(
-        "snapshot saved id=%s patient=%s bpm=%s quality=%s",
-        record["id"][:8], record.get("patientId"),
+        "snapshot saved id=%s mode=%s bpm=%s quality=%s",
+        record["id"][:8], record.get("mode"),
         fused.get("bpm"), fused.get("quality"),
     )
     return {"ok": True, "id": record["id"]}

@@ -47,6 +47,7 @@ export class RPPGEstimator {
     this.fitzpatrick = 3;
     this.deviceType  = 'desktop';
     this.mode        = 'face';
+    this.torchActive = false;  // set by main.js; relaxes finger gate when torch unavailable
 
     // Internal EMA (used only as prior for Welch peak selection — not the output BPM)
     this._emaBPM    = 75;
@@ -433,11 +434,12 @@ export class RPPGEstimator {
       if (k2 > 0 && k2 < segLen/2 && psd[k2] > psd[k] * 0.08)   harmonicFactor = 1.6;
       if (kHlf > 0 && kHlf < segLen/2 && psd[kHlf] > psd[k] * 0.08) harmonicFactor = Math.max(harmonicFactor, 1.3);
 
-      // Gaussian prior: strongly favour candidates near previous estimate
-      // Only apply when EMA is seeded (we have a real prior); otherwise flat.
-      const priorGaussian = this._emaSeeded
-        ? Math.exp(-0.5 * ((cBPM - priorBPM) / sigma) ** 2)
-        : 1.0;
+      // Gaussian prior: always applied — keeps the picker away from harmonic
+      // artefacts (e.g. 125 BPM when true HR is 70) from the very first window.
+      // Before the EMA is seeded we use a wider sigma (35 BPM) so it guides
+      // without over-constraining; once seeded, sigma tightens to 20 BPM.
+      const priorSigma    = this._emaSeeded ? sigma : 35;
+      const priorGaussian = Math.exp(-0.5 * ((cBPM - priorBPM) / priorSigma) ** 2);
 
       const score = psd[k] * harmonicFactor * priorGaussian;
       if (score > bestScore) { bestScore = score; bestK = k; }
@@ -831,20 +833,35 @@ export class RPPGEstimator {
     const agreement = acBPM !== null ? Math.abs(fftBPM - acBPM) : 999;
 
     // ── Step 5: finger dual-method gate ─────────────────────
-    // For finger: require FFT and autocorrelation to agree within 8 BPM.
-    // (8 BPM allows for autocorrelation's ±1-lag quantisation at 30fps ≈ ±2 BPM,
-    //  plus normal physiological variability between the two estimation methods.)
+    // With torch (high SNR): require FFT and autocorr to agree within 8 BPM.
+    // Without torch (iOS PWA — torch API unsupported): torch-less signal is
+    // noisy but still measurable; accept FFT alone when quality ≥ 0.25.
+    // Autocorr is still used as a soft blend when available.
     let windowBPM = fftBPM;
     if (this.mode === 'finger') {
-      if (acBPM === null || agreement >= 8) {
-        if (!this._emaSeeded && quality > 0.25) { this._emaBPM = fftBPM; this._emaSeeded = true; }
-        else if (quality > 0.15) { this._emaBPM = this._emaBPM * 0.90 + fftBPM * 0.10; }
-        const acStr = acBPM != null ? Math.round(acBPM) : '?';
-        console.log(`[rPPG finger] dual-method disagree ${Math.round(fftBPM)}↔${acStr} BPM — window rejected`);
-        return;
+      if (this.torchActive) {
+        // ── Torch ON: strict dual-method agreement required ──
+        if (acBPM === null || agreement >= 8) {
+          if (!this._emaSeeded && quality > 0.25) { this._emaBPM = fftBPM; this._emaSeeded = true; }
+          else if (quality > 0.15) { this._emaBPM = this._emaBPM * 0.90 + fftBPM * 0.10; }
+          const acStr = acBPM != null ? Math.round(acBPM) : '?';
+          console.log(`[rPPG finger+torch] dual-method disagree ${Math.round(fftBPM)}↔${acStr} BPM — window rejected`);
+          return;
+        }
+        windowBPM = (fftBPM + acBPM) / 2; // average for precision when both agree
+      } else {
+        // ── Torch OFF (iOS/unsupported): FFT-only, quality gate ──
+        if (quality < 0.25) {
+          if (quality > 0.10) { this._emaBPM = this._emaBPM * 0.95 + fftBPM * 0.05; }
+          console.log(`[rPPG finger-notorch] quality ${Math.round(quality*100)}% too low — window skipped`);
+          return;
+        }
+        // Soft-blend autocorr when it's available and plausible
+        if (acBPM !== null && agreement < 15) {
+          windowBPM = fftBPM * 0.65 + acBPM * 0.35;
+        }
+        console.log(`[rPPG finger-notorch] FFT=${Math.round(fftBPM)} Q=${Math.round(quality*100)}%`);
       }
-      // Average FFT + autocorr for better precision when they agree
-      windowBPM = (fftBPM + acBPM) / 2;
     }
 
     // ── Step 6: jump gate ────────────────────────────────────

@@ -11,9 +11,7 @@ import { RPPGEstimator } from './rppg.js';
 // Utilities
 // ─────────────────────────────────────────────────────────
 const $ = (id) => document.getElementById(id);
-const params = new URLSearchParams(location.search);
-const initialMode = (params.get('mode') === 'finger') ? 'finger' : 'face';
-const SCAN_SECONDS = 30;
+const PHASE_SECONDS = 20; // each of the two phases (face, finger)
 
 // Pick up the API key that the React app stores in localStorage on boot.
 // This lets the static scan page authenticate with the same key as the React client.
@@ -55,9 +53,11 @@ function setQuality(quality) {
 // ─────────────────────────────────────────────────────────
 // State
 // ─────────────────────────────────────────────────────────
-let mode = initialMode;
+let mode = 'face';           // current camera / rPPG mode
+let phase = 'idle';          // 'idle' | 'face' | 'transition' | 'finger' | 'done'
 let stream = null;
 let videoTrack = null;
+let torchActive = false;     // true only when torch was successfully applied
 let rppg = null;
 let hbSched = new HeartBeatScheduler();
 let scanRunning = false;
@@ -65,30 +65,23 @@ let scanStartedAt = 0;
 let countdownInterval = null;
 let lastVitals = { bpm: null, hrv_ms: null, spo2: null, brpm: null, quality: 0 };
 let bestVitals = { bpm: null, hrv_ms: null, spo2: null, brpm: null, quality: 0 };
+let faceVitals = null;       // locked after face phase completes
+let fingerVitals = null;     // locked after finger phase completes
 let saving = false;
 
 // ─────────────────────────────────────────────────────────
-// Mode pills
+// Phase step indicator
 // ─────────────────────────────────────────────────────────
-function setMode(m) {
-  if (scanRunning) return;
-  mode = (m === 'finger') ? 'finger' : 'face';
-  document.querySelectorAll('.mode-pill').forEach((el) => {
-    el.classList.toggle('active', el.dataset.mode === mode);
-  });
-  const tag = $('mode-tag');
-  if (tag) tag.textContent = mode === 'finger' ? 'Finger · PPG' : 'Face · rPPG';
-  $('cal-sub').textContent = mode === 'face'
-    ? 'Hold still. Keep your face gently in the frame. This is a wellness signal, not a diagnosis.'
-    : 'Place your fingertip lightly over the rear camera and flash. Cover the lens fully.';
-  // Restart camera with new constraints if we have one already
-  if (stream) restartCamera();
+function setPhaseSteps(ph) {
+  const faceStep   = $('step-face');
+  const fingerStep = $('step-finger');
+  if (!faceStep || !fingerStep) return;
+  faceStep.classList.remove('active', 'done');
+  fingerStep.classList.remove('active', 'done');
+  if (ph === 'face')                          { faceStep.classList.add('active'); }
+  else if (ph === 'transition' || ph === 'finger') { faceStep.classList.add('done'); fingerStep.classList.add('active'); }
+  else if (ph === 'done')                     { faceStep.classList.add('done'); fingerStep.classList.add('done'); }
 }
-document.querySelectorAll('.mode-pill').forEach((el) => {
-  el.addEventListener('click', () => setMode(el.dataset.mode));
-});
-// Set initial pill state
-setMode(mode);
 
 // ─────────────────────────────────────────────────────────
 // 3D heart (rose-glow)
@@ -261,14 +254,21 @@ async function startCamera() {
   });
   await video.play().catch(() => {});
 
-  // Try to enable torch on finger mode
+  // Try to enable torch on finger mode — track success so rPPG adjusts its gate
+  torchActive = false;
   if (mode === 'finger' && videoTrack && typeof videoTrack.getCapabilities === 'function') {
     try {
       const caps = videoTrack.getCapabilities();
       if (caps && caps.torch) {
         await videoTrack.applyConstraints({ advanced: [{ torch: true }] });
+        torchActive = true;
+        console.log('[somatic] torch enabled');
+      } else {
+        console.log('[somatic] torch not supported on this device — using no-torch finger mode');
       }
-    } catch (e) { /* torch optional */ }
+    } catch (e) {
+      console.log('[somatic] torch failed:', e.message);
+    }
   }
 
   setStartLabel('Begin scan', false);
@@ -296,9 +296,10 @@ async function restartCamera() {
 function setupRPPG() {
   const video = $('video');
   rppg = new RPPGEstimator(video);
-  rppg.mode = mode;
-  rppg.deviceType = DEVICE;
+  rppg.mode        = mode;
+  rppg.deviceType  = DEVICE;
   rppg.fitzpatrick = 3;
+  rppg.torchActive = (mode === 'finger') ? torchActive : false;
   rppg.onUpdate = (bpm, hrv_ms, spo2, brpm, quality) => {
     lastVitals = { bpm, hrv_ms, spo2, brpm, quality };
     if (bpm && Number.isFinite(bpm)) hbSched.update(bpm, hrv_ms || 35);
@@ -315,38 +316,26 @@ function setupRPPG() {
 // ─────────────────────────────────────────────────────────
 // Snapshot save
 // ─────────────────────────────────────────────────────────
-async function saveSnapshot() {
+async function saveSnapshot(prebuiltPayload = null) {
   if (saving) return;
   saving = true;
   setStatus('Saving your reading…');
 
-  // Prefer the best accepted window; fall back to last update; then fall back
-  // to the rPPG's internal EMA (updated even when windows are rejected) so we
-  // never write pure nulls into Firestore after a completed scan.
-  let final = (bestVitals.bpm != null) ? bestVitals : lastVitals;
-  if (final.bpm == null && rppg && rppg._emaBPM && rppg._emaBPM !== 75) {
-    final = {
-      bpm: Math.round(rppg._emaBPM),
-      hrv_ms: (rppg.hrv_ms && rppg.hrv_ms !== 45) ? rppg.hrv_ms : null,
-      spo2: null,   // SpO2 only valid from accepted windows
-      brpm: null,
-      quality: rppg.quality || 0,
+  // Use pre-built payload (from dual scan) or build one from single-mode vitals
+  const payload = prebuiltPayload ?? (() => {
+    let final = (bestVitals.bpm != null) ? bestVitals : lastVitals;
+    if (final.bpm == null && rppg && rppg._emaBPM && rppg._emaBPM !== 75) {
+      final = { bpm: Math.round(rppg._emaBPM), hrv_ms: (rppg.hrv_ms && rppg.hrv_ms !== 45) ? rppg.hrv_ms : null, spo2: null, brpm: null, quality: rppg.quality || 0 };
+    }
+    return {
+      mode,
+      deviceType: DEVICE,
+      durationSec: Math.round((performance.now() - scanStartedAt) / 1000),
+      fused: { bpm: final.bpm != null ? Math.round(final.bpm) : null, hrv_ms: final.hrv_ms != null ? Math.round(final.hrv_ms) : null, spo2: final.spo2 != null ? Math.round(final.spo2) : null, brpm: final.brpm != null ? Math.round(final.brpm) : null, quality: final.quality ?? 0 },
+      face: mode === 'face' ? { result: { bpm: final.bpm, hrv_ms: final.hrv_ms, spo2: final.spo2, brpm: final.brpm, quality: final.quality } } : null,
+      finger: mode === 'finger' ? { result: { bpm: final.bpm, hrv_ms: final.hrv_ms, spo2: final.spo2, brpm: final.brpm, quality: final.quality } } : null,
     };
-  }
-  const payload = {
-    mode,
-    deviceType: DEVICE,
-    durationSec: Math.round((performance.now() - scanStartedAt) / 1000),
-    fused: {
-      bpm: final.bpm != null ? Math.round(final.bpm) : null,
-      hrv_ms: final.hrv_ms != null ? Math.round(final.hrv_ms) : null,
-      spo2: final.spo2 != null ? Math.round(final.spo2) : null,
-      brpm: final.brpm != null ? Math.round(final.brpm) : null,
-      quality: final.quality ?? 0,
-    },
-    face: mode === 'face' ? { result: { bpm: final.bpm, hrv_ms: final.hrv_ms, spo2: final.spo2, brpm: final.brpm, quality: final.quality } } : null,
-    finger: mode === 'finger' ? { result: { bpm: final.bpm, hrv_ms: final.hrv_ms, spo2: final.spo2, brpm: final.brpm, quality: final.quality } } : null,
-  };
+  })();
   try {
     const headers = { 'Content-Type': 'application/json' };
     if (API_KEY) headers['X-API-Key'] = API_KEY;
@@ -355,8 +344,22 @@ async function saveSnapshot() {
       headers,
       body: JSON.stringify(payload),
     });
+    if (!res.ok) {
+      let msg = `Server error ${res.status}`;
+      if (res.status === 401 || res.status === 403) {
+        msg = `Auth error (${res.status}) \u2014 API key mismatch or missing`;
+      } else {
+        // Try to extract the detail message from the response body
+        try {
+          const errBody = await res.clone().json();
+          if (errBody?.detail) msg = `${res.status}: ${errBody.detail}`;
+        } catch {}
+      }
+      console.error('[somatic] save failed:', msg);
+      throw new Error(msg);
+    }
     const data = await res.json();
-    if (!data?.ok || !data?.id) throw new Error('Save failed');
+    if (!data?.ok || !data?.id) throw new Error('Save response missing id');
     // Cache for Home/Results to read
     try {
       if (payload.fused.bpm != null) localStorage.setItem('somatic.lastBpm', String(payload.fused.bpm));
@@ -365,60 +368,183 @@ async function saveSnapshot() {
     // Navigate to React Results
     location.href = `/results/${data.id}`;
   } catch (e) {
-    console.error('[somatic] save error', e);
-    setStatus('Couldn\u2019t save right now. Try again.');
+    console.error('[somatic] save error:', e.message);
+    setStatus('Couldn\u2019t save \u2014 tap to retry');
+    const sb = $('status-bar');
+    if (sb) {
+      sb.style.cursor = 'pointer';
+      sb.addEventListener('click', () => { sb.style.cursor = ''; saving = false; saveSnapshot(); }, { once: true });
+    }
     saving = false;
   }
 }
 
 // ─────────────────────────────────────────────────────────
-// Countdown / scan flow
+// Phase transition overlay helpers
+// ─────────────────────────────────────────────────────────
+let _ptInterval = null;
+function showPhaseTransition() {
+  const el = $('phase-transition');
+  if (!el) return;
+  el.classList.remove('hidden');
+  let count = 3;
+  const countEl = $('pt-count');
+  if (countEl) countEl.textContent = `Starting in ${count}…`;
+  _ptInterval = setInterval(() => {
+    count--;
+    if (countEl) countEl.textContent = count > 0 ? `Starting in ${count}…` : 'Get ready…';
+  }, 1000);
+}
+function hidePhaseTransition() {
+  if (_ptInterval) { clearInterval(_ptInterval); _ptInterval = null; }
+  $('phase-transition')?.classList.add('hidden');
+}
+
+// ─────────────────────────────────────────────────────────
+// Scan flow
 // ─────────────────────────────────────────────────────────
 function startScan() {
-  if (scanRunning) return;
+  if (scanRunning || phase !== 'idle') return;
+  faceVitals = null;
+  fingerVitals = null;
+  runPhase('face');
+}
+
+function runPhase(ph) {
+  mode = ph;
+  phase = ph;
   scanRunning = true;
   scanStartedAt = performance.now();
   bestVitals = { bpm: null, hrv_ms: null, spo2: null, brpm: null, quality: 0 };
-  $('calibration-overlay').classList.add('fade');
-  $('video').classList.remove('dim');
-  $('hud').classList.add('visible');
-  $('mode-tag').classList.remove('hidden');
-  $('countdown-overlay').classList.add('visible');
-  setStatus(mode === 'face' ? 'Face · measuring…' : 'Finger · measuring…');
+
+  // Reset HUD live values
+  $('hr-value').textContent = '—';
+  $('hrv-value').textContent = '—';
+  $('br-value').textContent = '—';
+
+  if (ph === 'face') {
+    $('calibration-overlay').classList.add('fade');
+    $('video').classList.remove('dim');
+    $('hud').classList.add('visible');
+    $('mode-tag').classList.remove('hidden');
+    $('countdown-overlay').classList.add('visible');
+  }
+
+  const tag = $('mode-tag');
+  if (tag) tag.textContent = ph === 'face' ? 'Phase 1 · Face · rPPG' : 'Phase 2 · Finger · PPG';
+  setStatus(ph === 'face' ? 'Phase 1 · Face · measuring…' : 'Phase 2 · Finger · measuring…');
+  setPhaseSteps(ph);
+
+  // Finish button label: during face → "Next: Finger →", during finger → "Save reading"
+  const finishBtn = $('finish-btn');
+  if (finishBtn) {
+    finishBtn.textContent = ph === 'face' ? 'Skip to Finger →' : 'Save reading';
+    finishBtn.classList.add('ready');
+  }
 
   setupRPPG();
   rppg.start();
 
   // Countdown ring
   const ring = $('ring-fg');
-  const num = $('ring-num');
-  const totalMs = SCAN_SECONDS * 1000;
-  const circumference = 2 * Math.PI * 140; // r=140
-  ring.style.strokeDasharray = String(circumference);
+  const num  = $('ring-num');
+  const circumference = 2 * Math.PI * 140;
+  ring.style.strokeDasharray  = String(circumference);
   ring.style.strokeDashoffset = String(circumference);
+  num.textContent = String(PHASE_SECONDS);
 
   countdownInterval = setInterval(() => {
-    const elapsed = performance.now() - scanStartedAt;
-    const remain = Math.max(0, SCAN_SECONDS - Math.floor(elapsed / 1000));
+    const elapsed  = performance.now() - scanStartedAt;
+    const remain   = Math.max(0, PHASE_SECONDS - Math.floor(elapsed / 1000));
     num.textContent = String(remain);
-    const progress = Math.min(1, elapsed / totalMs);
-    ring.style.strokeDashoffset = String(circumference * (1 - progress));
-    if (elapsed >= totalMs) {
+    ring.style.strokeDashoffset = String(circumference * (1 - Math.min(1, elapsed / (PHASE_SECONDS * 1000))));
+    if (elapsed >= PHASE_SECONDS * 1000) {
       clearInterval(countdownInterval); countdownInterval = null;
-      finishScan(/*auto=*/true);
+      finishPhase(/*auto=*/true);
     }
   }, 150);
 }
 
-function finishScan(_auto = false) {
+async function finishPhase(_auto = false) {
   if (!scanRunning) return;
   scanRunning = false;
   if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
   try { rppg && rppg.stop(); } catch {}
-  $('countdown-overlay').classList.remove('visible');
-  $('finish-btn')?.classList.add('ready');
-  setStatus('Reading locked');
-  saveSnapshot();
+
+  // Capture best vitals; EMA fallback if no window was accepted
+  let captured = { ...bestVitals };
+  if (captured.bpm == null && rppg && rppg._emaBPM && rppg._emaBPM !== 75) {
+    captured = { bpm: Math.round(rppg._emaBPM), hrv_ms: (rppg.hrv_ms && rppg.hrv_ms !== 45) ? rppg.hrv_ms : null, spo2: null, brpm: null, quality: rppg.quality || 0 };
+  }
+
+  if (phase === 'face') {
+    faceVitals = captured;
+    phase = 'transition';
+    mode  = 'finger';
+    $('countdown-overlay').classList.remove('visible');
+    setPhaseSteps('transition');
+
+    // Stop front camera immediately (saves battery, avoids confusion)
+    await stopCamera();
+    showPhaseTransition();
+
+    // After countdown, start rear camera + finger phase
+    setTimeout(async () => {
+      hidePhaseTransition();
+      await startCamera();  // mode='finger' → rear camera + torch attempt
+      $('countdown-overlay').classList.add('visible');
+      runPhase('finger');
+    }, 3000);
+
+  } else if (phase === 'finger') {
+    fingerVitals = captured;
+    phase = 'done';
+    $('countdown-overlay').classList.remove('visible');
+    setPhaseSteps('done');
+    const finishBtn = $('finish-btn');
+    if (finishBtn) finishBtn.classList.remove('ready');
+    setStatus('Both readings captured · saving…');
+    fuseAndSave();
+  }
+}
+
+function fuseAndSave() {
+  const fQ     = faceVitals?.quality   || 0;
+  const fiQ    = fingerVitals?.quality || 0;
+  const totalQ = (fQ + fiQ) || 1;
+
+  // BPM: quality-weighted average of both phases
+  let fusedBpm = null;
+  if (faceVitals?.bpm != null && fingerVitals?.bpm != null) {
+    fusedBpm = Math.round((faceVitals.bpm * fQ + fingerVitals.bpm * fiQ) / totalQ);
+  } else {
+    fusedBpm = faceVitals?.bpm != null   ? Math.round(faceVitals.bpm)
+             : fingerVitals?.bpm != null ? Math.round(fingerVitals.bpm) : null;
+  }
+
+  // HRV: prefer finger (contact PPG more reliable for HRV)
+  const fusedHrv  = fingerVitals?.hrv_ms  ?? faceVitals?.hrv_ms  ?? null;
+  // SpO2: finger only (face rPPG cannot reliably estimate SpO2)
+  const fusedSpo2 = fingerVitals?.spo2    ?? null;
+  // Breathing rate: prefer face rPPG (respiratory signal stronger in face)
+  const fusedBrpm = faceVitals?.brpm      ?? fingerVitals?.brpm   ?? null;
+
+  const payload = {
+    mode: 'dual',
+    deviceType: DEVICE,
+    durationSec: PHASE_SECONDS * 2,
+    fused: {
+      bpm:    fusedBpm,
+      hrv_ms: fusedHrv  != null ? Math.round(fusedHrv)  : null,
+      spo2:   fusedSpo2 != null ? Math.round(fusedSpo2) : null,
+      brpm:   fusedBrpm != null ? Math.round(fusedBrpm) : null,
+      quality: (fQ + fiQ) / 2,
+    },
+    face:   faceVitals   ? { result: faceVitals }   : null,
+    finger: fingerVitals ? { result: fingerVitals } : null,
+  };
+
+  saveSnapshot(payload);
 }
 
 // ─────────────────────────────────────────────────────────
@@ -436,7 +562,8 @@ $('start-btn').addEventListener('click', async () => {
   startScan();
 });
 $('finish-btn').addEventListener('click', () => {
-  if (scanRunning) finishScan(false);
+  // During face phase: skip to finger. During finger phase: end early and save.
+  if (scanRunning) finishPhase(false);
 });
 window.addEventListener('beforeunload', () => {
   try { rppg && rppg.stop(); } catch {}
@@ -450,14 +577,14 @@ window.addEventListener('beforeunload', () => {
   // Show an enabled button immediately — on iOS PWA getUserMedia must be
   // called inside a user gesture, so we can't block the button on auto-start.
   setStartLabel('Begin scan', false);
+  setPhaseSteps('idle'); // no step highlighted yet
   setupHeartScene();
 
-  // Attempt to auto-start camera (works on Android PWA and desktop; may be
-  // silently skipped on iOS PWA if permission hasn't been granted yet).
-  const ok = await startCamera();
+  // Attempt to auto-start front camera (face phase). Works on Android PWA and
+  // desktop; may be silently skipped on iOS PWA if permission hasn't been
+  // granted yet — click handler retries startCamera() as a user gesture.
+  const ok = await startCamera(); // mode='face' → front camera
   if (ok) {
     $('video')?.classList.add('dim'); // dim for ambience before scan starts
   }
-  // If auto-start failed, button stays enabled with 'Begin scan' label.
-  // The click handler will retry startCamera() as a user gesture.
 })();
