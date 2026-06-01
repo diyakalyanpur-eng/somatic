@@ -7,7 +7,8 @@ export const API = `${BACKEND_URL}/api`;
 
 const defaultHeaders = {};
 // Attach API key — must match API_KEY in backend/.env.
-const apiKey = import.meta.env.VITE_API_KEY;
+// Priority: VITE_API_KEY baked in at build time → window.__somatic.apiKey injected at runtime by /config.js
+const apiKey = import.meta.env.VITE_API_KEY || window.__somatic?.apiKey || "";
 if (apiKey) {
   defaultHeaders["X-API-Key"] = apiKey;
   // Also cache in localStorage so standalone HTML pages (aisteth.html, heartsize.html)

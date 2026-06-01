@@ -1268,6 +1268,22 @@ async def condition_affirmation(request: Request) -> Dict[str, Any]:
 
 app.include_router(api)
 
+# ── Runtime client config ──────────────────────────────────────────────────────
+# Serves the backend API key to all frontend pages at runtime, avoiding the need
+# to bake VITE_API_KEY into the Docker build. Every HTML page loads this script
+# before its own code so window.__somatic.apiKey is always available.
+import json as _json
+from fastapi.responses import Response as _Response
+
+@app.get("/config.js", include_in_schema=False)
+async def client_config():
+    content = f"window.__somatic = {{ apiKey: {_json.dumps(API_KEY or '')} }};"
+    return _Response(
+        content=content,
+        media_type="application/javascript",
+        headers={"Cache-Control": "no-store, no-cache"},
+    )
+
 # Note: middleware is applied in reverse order; CORS must wrap the API key check.
 app.add_middleware(
     CORSMiddleware,

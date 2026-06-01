@@ -13,9 +13,16 @@ import { RPPGEstimator } from './rppg.js';
 const $ = (id) => document.getElementById(id);
 const PHASE_SECONDS = 20; // each of the two phases (face, finger)
 
-// Pick up the API key that the React app stores in localStorage on boot.
-// This lets the static scan page authenticate with the same key as the React client.
-const API_KEY = (() => { try { return localStorage.getItem('somatic.apiKey') || ''; } catch { return ''; } })();
+// Pick up the API key at fetch time (not module load) from two sources:
+//   1. window.__somatic.apiKey — injected by /config.js at page load (preferred, always current)
+//   2. localStorage.somatic.apiKey — written by the React app on boot (fallback)
+function getApiKey() {
+  try {
+    return window.__somatic?.apiKey
+        || localStorage.getItem('somatic.apiKey')
+        || '';
+  } catch { return ''; }
+}
 
 function detectDevice() {
   const ua = navigator.userAgent || '';
@@ -346,7 +353,8 @@ async function saveSnapshot(prebuiltPayload = null) {
 
   try {
     const headers = { 'Content-Type': 'application/json' };
-    if (API_KEY) headers['X-API-Key'] = API_KEY;
+    const apiKey = getApiKey();
+    if (apiKey) headers['X-API-Key'] = apiKey;
     const res = await fetch('/api/snapshot', {
       method: 'POST',
       headers,
