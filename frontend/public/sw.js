@@ -1,7 +1,7 @@
 // Somatic Service Worker — cache-first for app shell, network-first for API
 // IMPORTANT: bump the cache version whenever you change this file so the
 // new SW activates and old cached files are cleared.
-const CACHE = "somatic-v6";
+const CACHE = "somatic-v7";
 
 // Files to pre-cache on install (the app shell)
 // NOTE: Use "/" (not "/index.html") for the SPA shell — "/" always goes through
@@ -61,9 +61,11 @@ self.addEventListener("activate", (e) => {
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
 
-  // 1. API calls — always network, never cache
+  // 1. API calls — always go straight to the network, never cache.
+  //    Don't call e.respondWith() at all: letting the event fall through gives the
+  //    browser its default fetch behaviour, which avoids an iOS Safari bug where
+  //    fetch(e.request) inside a SW fails for POST requests with a consumed body.
   if (url.pathname.startsWith("/api/")) {
-    e.respondWith(fetch(e.request));
     return;
   }
 

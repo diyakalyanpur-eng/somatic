@@ -68,6 +68,7 @@ let bestVitals = { bpm: null, hrv_ms: null, spo2: null, brpm: null, quality: 0 }
 let faceVitals = null;       // locked after face phase completes
 let fingerVitals = null;     // locked after finger phase completes
 let saving = false;
+let lastSavePayload = null;  // retained so retry always uses the original payload
 
 // ─────────────────────────────────────────────────────────
 // Phase step indicator
@@ -321,8 +322,11 @@ async function saveSnapshot(prebuiltPayload = null) {
   saving = true;
   setStatus('Saving your reading…');
 
+  // On retry (no new payload), reuse the last payload so dual-scan data is preserved.
+  const resolvedPrebuilt = prebuiltPayload ?? lastSavePayload;
+
   // Use pre-built payload (from dual scan) or build one from single-mode vitals
-  const payload = prebuiltPayload ?? (() => {
+  const payload = resolvedPrebuilt ?? (() => {
     let final = (bestVitals.bpm != null) ? bestVitals : lastVitals;
     if (final.bpm == null && rppg && rppg._emaBPM && rppg._emaBPM !== 75) {
       final = { bpm: Math.round(rppg._emaBPM), hrv_ms: (rppg.hrv_ms && rppg.hrv_ms !== 45) ? rppg.hrv_ms : null, spo2: null, brpm: null, quality: rppg.quality || 0 };
@@ -336,6 +340,10 @@ async function saveSnapshot(prebuiltPayload = null) {
       finger: mode === 'finger' ? { result: { bpm: final.bpm, hrv_ms: final.hrv_ms, spo2: final.spo2, brpm: final.brpm, quality: final.quality } } : null,
     };
   })();
+
+  // Store so retry can always resend the same payload (critical for dual-scan)
+  lastSavePayload = payload;
+
   try {
     const headers = { 'Content-Type': 'application/json' };
     if (API_KEY) headers['X-API-Key'] = API_KEY;
@@ -345,9 +353,9 @@ async function saveSnapshot(prebuiltPayload = null) {
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
-      let msg = `Server error ${res.status}`;
+      let msg = `Error ${res.status}`;
       if (res.status === 401 || res.status === 403) {
-        msg = `Auth error (${res.status}) \u2014 API key mismatch or missing`;
+        msg = `Auth ${res.status} \u2014 API key missing`;
       } else {
         // Try to extract the detail message from the response body
         try {
@@ -369,7 +377,9 @@ async function saveSnapshot(prebuiltPayload = null) {
     location.href = `/results/${data.id}`;
   } catch (e) {
     console.error('[somatic] save error:', e.message);
-    setStatus('Couldn\u2019t save \u2014 tap to retry');
+    // Show error detail in status bar so it's visible on mobile (no console access)
+    const brief = e.message.length > 50 ? e.message.slice(0, 47) + '\u2026' : e.message;
+    setStatus(`Save failed (${brief}) \u2014 tap to retry`);
     const sb = $('status-bar');
     if (sb) {
       sb.style.cursor = 'pointer';
