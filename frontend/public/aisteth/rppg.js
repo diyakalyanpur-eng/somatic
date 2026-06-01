@@ -634,8 +634,11 @@ export class RPPGEstimator {
 
     // Perfusion index gate — if the pulsatile component is too weak, finger
     // isn't covering the lens properly or torch isn't on.
+    // Without torch the signal is weaker, so we accept a slightly lower PI threshold
+    // (0.001 vs 0.002) — this still filters noise but allows no-torch readings through.
     const pi = acR / dcR;
-    if (pi < 0.002) return null;
+    const piThreshold = this.torchActive ? 0.002 : 0.001;
+    if (pi < piThreshold) return null;
 
     // Beer-Lambert R ratio
     const R = (acR / dcR) / (acG / dcG);

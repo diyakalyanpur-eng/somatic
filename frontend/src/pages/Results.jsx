@@ -55,6 +55,7 @@ export default function Results() {
         <BeatingHeart3D bpm={f.bpm || 60} hrv={f.hrv_ms || 30} size={240} />
         <div className="display mt-2 text-6xl font-semibold tracking-tight" data-testid="results-bpm">{f.bpm ?? "—"}</div>
         <div className="text-[11px] uppercase tracking-wider text-[#8A8280]">bpm</div>
+        <p className="mt-1 text-[10px] text-[#8A8280]">Camera-based estimate · slight variation from a clinical reading is normal</p>
       </div>
 
       <div className="mt-5 grid grid-cols-3 gap-2" data-testid="results-vital-grid">

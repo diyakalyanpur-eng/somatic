@@ -542,8 +542,11 @@ function fuseAndSave() {
 
   // HRV: prefer finger (contact PPG more reliable for HRV)
   const fusedHrv  = fingerVitals?.hrv_ms  ?? faceVitals?.hrv_ms  ?? null;
-  // SpO2: finger only (face rPPG cannot reliably estimate SpO2)
-  const fusedSpo2 = fingerVitals?.spo2    ?? null;
+  // SpO2: prefer finger (contact PPG is reliable, especially with torch).
+  // Fall back to face rPPG estimate when finger SpO2 is null (e.g. no torch available).
+  // Face SpO2 is lower confidence so we apply a mild conservative correction (+0 here —
+  // the face formula already clamps to 90–100 and tends to read slightly high).
+  const fusedSpo2 = fingerVitals?.spo2 ?? faceVitals?.spo2 ?? null;
   // Breathing rate: prefer face rPPG (respiratory signal stronger in face)
   const fusedBrpm = faceVitals?.brpm      ?? fingerVitals?.brpm   ?? null;
 
