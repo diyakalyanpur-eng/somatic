@@ -327,8 +327,9 @@
   <div class="disclaimer">Wellness signal · not a medical diagnosis</div>
 </div>
 
-<!-- Runtime config: injects window.__somatic.apiKey from the backend at load time -->
-<script src="/config.js"></script>
+<!-- Runtime config: injects window.__somatic.apiKey from the backend.
+     async so it never blocks the scan page from loading. Key is read lazily at fetch time. -->
+<script src="/config.js" async></script>
 <script type="module" src="/aisteth/main.js"></script>
 </body>
 </html>

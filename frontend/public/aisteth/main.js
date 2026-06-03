@@ -351,6 +351,10 @@ async function saveSnapshot(prebuiltPayload = null) {
   // Store so retry can always resend the same payload (critical for dual-scan)
   lastSavePayload = payload;
 
+  // Persist to localStorage BEFORE the network call so a crash, kill, or network
+  // failure never loses the scan data. Cleared on successful save.
+  try { localStorage.setItem('somatic.pendingScan', JSON.stringify(payload)); } catch {}
+
   try {
     const headers = { 'Content-Type': 'application/json' };
     const apiKey = getApiKey();
@@ -376,7 +380,9 @@ async function saveSnapshot(prebuiltPayload = null) {
     }
     const data = await res.json();
     if (!data?.ok || !data?.id) throw new Error('Save response missing id');
-    // Cache for Home/Results to read
+    // Save succeeded — clear the pending scan so the home screen doesn't offer recovery.
+    try { localStorage.removeItem('somatic.pendingScan'); } catch {}
+    // Cache vitals for Home/Results to read
     try {
       if (payload.fused.bpm != null) localStorage.setItem('somatic.lastBpm', String(payload.fused.bpm));
       if (payload.fused.hrv_ms != null) localStorage.setItem('somatic.lastHrv', String(payload.fused.hrv_ms));

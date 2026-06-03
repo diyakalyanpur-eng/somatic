@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { getAffirmationToday, getStreak, listSnapshots, logPractice } from "@/lib/api";
+import { getAffirmationToday, getStreak, listSnapshots, logPractice, http } from "@/lib/api";
 import { getProfile, getLatestBpm, getLatestHrv, nervousSystemState, timeAwareGreeting } from "@/lib/wellness";
-import { Heart, Activity, Flame, ChevronRight, Sparkles, BookOpen } from "lucide-react";
+import { Heart, Activity, Flame, ChevronRight, Sparkles, BookOpen, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Home() {
@@ -12,6 +12,8 @@ export default function Home() {
   const [aff, setAff] = useState(null);
   const [streak, setStreak] = useState(0);
   const [snapshots, setSnapshots] = useState([]);
+  const [pendingScan, setPendingScan] = useState(null);
+  const [savingPending, setSavingPending] = useState(false);
   const bpm = getLatestBpm() || 60;
   const hrv = getLatestHrv();
   const ns = nervousSystemState(hrv);
@@ -22,7 +24,28 @@ export default function Home() {
       try { const d = await getStreak(); setStreak(d.streak || 0); } catch {}
       try { const d = await listSnapshots({ limit: 1 }); setSnapshots(d.rows || []); } catch {}
     })();
+    // Check for a scan that failed to save (network error, cold start, etc.)
+    try {
+      const raw = localStorage.getItem("somatic.pendingScan");
+      if (raw) setPendingScan(JSON.parse(raw));
+    } catch {}
   }, []);
+
+  const savePendingScan = async () => {
+    if (!pendingScan || savingPending) return;
+    setSavingPending(true);
+    try {
+      const { data } = await http.post("/snapshot", pendingScan);
+      if (!data?.ok || !data?.id) throw new Error("Save response missing id");
+      localStorage.removeItem("somatic.pendingScan");
+      setPendingScan(null);
+      navigate(`/results/${data.id}`);
+    } catch (e) {
+      toast.error("Still couldn't save — check your connection and try again.");
+    } finally {
+      setSavingPending(false);
+    }
+  };
 
   return (
     <div className="relative max-w-md mx-auto px-5 pt-3 pb-6">
@@ -53,6 +76,26 @@ export default function Home() {
           </div>
         </button>
       </div>
+
+      {pendingScan && (
+        <motion.div
+          initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
+          className="mt-4 flex items-center gap-3 rounded-2xl border border-[#F5C87A]/40 bg-[#F5C87A]/10 px-4 py-3"
+          data-testid="home-pending-scan-banner"
+        >
+          <AlertCircle className="w-4 h-4 shrink-0 text-[#F5C87A]" />
+          <p className="flex-1 text-sm text-[#F0EDE8]">You have an unsaved scan.</p>
+          <button
+            onClick={savePendingScan}
+            disabled={savingPending}
+            className="inline-flex items-center gap-1 text-sm font-semibold text-[#F5C87A] hover:text-[#f7d89a] disabled:opacity-60 transition-colors"
+          >
+            {savingPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+            {savingPending ? "Saving…" : "Save now"}
+            {!savingPending && <ChevronRight className="w-3.5 h-3.5" />}
+          </button>
+        </motion.div>
+      )}
 
       <div className="mt-6 flex gap-3 overflow-x-auto no-scrollbar -mx-5 px-5" data-testid="home-cards-strip">
         <SnapshotCard

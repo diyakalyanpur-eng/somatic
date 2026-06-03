@@ -1,7 +1,7 @@
 // Somatic Service Worker — cache-first for app shell, network-first for API
 // IMPORTANT: bump the cache version whenever you change this file so the
 // new SW activates and old cached files are cleared.
-const CACHE = "somatic-v7";
+const CACHE = "somatic-v8";
 
 // Files to pre-cache on install (the app shell)
 // NOTE: Use "/" (not "/index.html") for the SPA shell — "/" always goes through
@@ -14,6 +14,13 @@ const SHELL = [
   "/heartsize.html",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
+  // Scan page JS — pre-cached so the scan works even if the user hasn't
+  // visited the scan page since the last SW update.
+  "/aisteth/main.js",
+  "/aisteth/rppg.js",
+  "/aisteth/cardiac-glyph.js",
+  "/aisteth/heartbeat.js",
+  "/aisteth/handtrack.js",
 ];
 
 // These paths must be served as-is, never replaced with index.html.
@@ -66,6 +73,31 @@ self.addEventListener("fetch", (e) => {
   //    browser its default fetch behaviour, which avoids an iOS Safari bug where
   //    fetch(e.request) inside a SW fails for POST requests with a consumed body.
   if (url.pathname.startsWith("/api/")) {
+    return;
+  }
+
+  // 1b. /config.js — network-first, but fall back to a cached copy so a cold-start
+  //     backend or offline resume never causes a black screen.
+  //     If even the cache is empty, serve an empty config so the app can still mount
+  //     (the key will be picked up from localStorage on the first real API call).
+  if (url.pathname === "/config.js") {
+    e.respondWith(
+      fetch("/config.js")
+        .then((res) => {
+          if (res.ok) {
+            caches.open(CACHE).then((c) => c.put("/config.js", res.clone()));
+          }
+          return res;
+        })
+        .catch(() =>
+          caches.match("/config.js").then(
+            (cached) => cached || new Response(
+              'window.__somatic={apiKey:""};',
+              { headers: { "Content-Type": "application/javascript" } }
+            )
+          )
+        )
+    );
     return;
   }
 

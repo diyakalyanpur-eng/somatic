@@ -6,17 +6,31 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "";
 export const API = `${BACKEND_URL}/api`;
 
 const defaultHeaders = {};
-// Attach API key — must match API_KEY in backend/.env.
-// Priority: VITE_API_KEY baked in at build time → window.__somatic.apiKey injected at runtime by /config.js
-const apiKey = import.meta.env.VITE_API_KEY || window.__somatic?.apiKey || "";
-if (apiKey) {
-  defaultHeaders["X-API-Key"] = apiKey;
-  // Also cache in localStorage so standalone HTML pages (aisteth.html, heartsize.html)
-  // can read it at runtime — they can't access Vite's import.meta.env.
-  try { localStorage.setItem("somatic.apiKey", apiKey); } catch {}
+// If VITE_API_KEY is baked in at build time, use it immediately and persist it.
+const buildApiKey = import.meta.env.VITE_API_KEY;
+if (buildApiKey) {
+  defaultHeaders["X-API-Key"] = buildApiKey;
+  try { localStorage.setItem("somatic.apiKey", buildApiKey); } catch {}
 }
 
 export const http = axios.create({ baseURL: API, timeout: 30000, headers: defaultHeaders });
+
+// Runtime key fallback — reads window.__somatic.apiKey (from /config.js, loaded async)
+// or localStorage at request-time, so a cold-start or async script load never blocks the app.
+// If VITE_API_KEY was already set above this is a no-op (header already on the instance).
+if (!buildApiKey) {
+  http.interceptors.request.use((cfg) => {
+    const key = window.__somatic?.apiKey
+             || localStorage.getItem("somatic.apiKey")
+             || "";
+    if (key) {
+      cfg.headers["X-API-Key"] = key;
+      // Persist so subsequent requests and standalone pages always have it.
+      try { localStorage.setItem("somatic.apiKey", key); } catch {}
+    }
+    return cfg;
+  });
+}
 
 export const getStats = async () => (await http.get("/stats")).data;
 export const listSnapshots = async (opts = {}) => (await http.get("/snapshots", { params: opts })).data;
