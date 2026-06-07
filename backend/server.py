@@ -246,6 +246,7 @@ async def save_snapshot(request: Request) -> Dict[str, Any]:
         "durationSec": body.get("durationSec"),
         "assessmentId": body.get("assessmentId"),
         "patientId": body.get("patientId"),
+        "phone": body.get("phone"),          # user's phone number for family linking
         "fused": fused,
         "face": body.get("face"),
         "finger": body.get("finger"),
@@ -273,10 +274,13 @@ async def list_snapshots(
     limit: int = Query(50, le=500),
     offset: int = 0,
     patientId: Optional[str] = None,
+    phone: Optional[str] = None,
 ) -> Dict[str, Any]:
     q: Dict[str, Any] = {}
     if patientId:
-        q = {"patientId": patientId}
+        q["patientId"] = patientId
+    if phone:
+        q["phone"] = phone
     cursor = (
         snapshots_col.find(q, {"_id": 0})
         .sort("created_at", -1)
@@ -294,6 +298,30 @@ async def get_snapshot(sid: str) -> Dict[str, Any]:
     if not doc:
         raise HTTPException(status_code=404, detail="Not found")
     return {"ok": True, "row": doc}
+
+
+# ── GDPR right to erasure ────────────────────────────────
+# Deletes ALL snapshots for the requesting session.
+# In a multi-user system this would filter by user ID; for now it removes
+# everything so a single user can fully wipe their data as required by GDPR Art. 17.
+@api.delete("/user/data")
+async def delete_user_data(request: Request) -> Dict[str, Any]:
+    try:
+        # Filter by phone when provided so we only erase the requesting user's data
+        body = {}
+        try:
+            body = await request.json()
+        except Exception:
+            pass
+        phone = body.get("phone") if body else None
+        q = {"phone": phone} if phone else {}
+        result = await snapshots_col.delete_many(q)
+        deleted = result.deleted_count
+        logger.info("GDPR erasure: deleted %d snapshot(s) phone=%s", deleted, bool(phone))
+        return {"ok": True, "deleted": deleted}
+    except Exception as exc:
+        logger.exception("GDPR erasure failed: %s", exc)
+        raise HTTPException(status_code=500, detail=f"Erasure failed: {exc}")
 
 
 # ── Logs ──────────────────────────────────────────────────

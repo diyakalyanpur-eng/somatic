@@ -18,15 +18,41 @@ export default defineConfig({
     port: 3000,
     open: true,
     proxy: {
-      // Forward all /api/* calls from the Vite dev server to the FastAPI backend.
-      // This also handles the static aisteth.html scan page, which uses relative URLs.
       "/api": {
         target: "http://localhost:8001",
         changeOrigin: true,
       },
     },
   },
-  // Expose VITE_* env vars to client (default). Also expose legacy REACT_APP_*
-  // so any remaining references still work during transition.
   envPrefix: ["VITE_", "REACT_APP_"],
+  build: {
+    rollupOptions: {
+      output: {
+        // Split heavy libraries into separate cached chunks so the initial
+        // bundle (react + router + app shell) stays small and parses fast.
+        manualChunks(id) {
+          if (id.includes("node_modules/recharts") || id.includes("node_modules/d3-")) {
+            return "vendor-charts";
+          }
+          if (id.includes("node_modules/framer-motion")) {
+            return "vendor-motion";
+          }
+          if (id.includes("node_modules/three")) {
+            return "vendor-three";
+          }
+          if (id.includes("node_modules/@radix-ui")) {
+            return "vendor-radix";
+          }
+          if (
+            id.includes("node_modules/react/") ||
+            id.includes("node_modules/react-dom/") ||
+            id.includes("node_modules/react-router-dom/") ||
+            id.includes("node_modules/scheduler/")
+          ) {
+            return "vendor-react";
+          }
+        },
+      },
+    },
+  },
 });

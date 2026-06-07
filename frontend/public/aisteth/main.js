@@ -338,10 +338,13 @@ async function saveSnapshot(prebuiltPayload = null) {
     if (final.bpm == null && rppg && rppg._emaBPM && rppg._emaBPM !== 75) {
       final = { bpm: Math.round(rppg._emaBPM), hrv_ms: (rppg.hrv_ms && rppg.hrv_ms !== 45) ? rppg.hrv_ms : null, spo2: null, brpm: null, quality: rppg.quality || 0 };
     }
+    let singlePhone = null;
+    try { singlePhone = JSON.parse(localStorage.getItem('somatic.profile') || '{}').phone || null; } catch {}
     return {
       mode,
       deviceType: DEVICE,
       durationSec: Math.round((performance.now() - scanStartedAt) / 1000),
+      phone: singlePhone,
       fused: { bpm: final.bpm != null ? Math.round(final.bpm) : null, hrv_ms: final.hrv_ms != null ? Math.round(final.hrv_ms) : null, spo2: final.spo2 != null ? Math.round(final.spo2) : null, brpm: final.brpm != null ? Math.round(final.brpm) : null, quality: final.quality ?? 0 },
       face: mode === 'face' ? { result: { bpm: final.bpm, hrv_ms: final.hrv_ms, spo2: final.spo2, brpm: final.brpm, quality: final.quality } } : null,
       finger: mode === 'finger' ? { result: { bpm: final.bpm, hrv_ms: final.hrv_ms, spo2: final.spo2, brpm: final.brpm, quality: final.quality } } : null,
@@ -556,10 +559,18 @@ function fuseAndSave() {
   // Breathing rate: prefer face rPPG (respiratory signal stronger in face)
   const fusedBrpm = faceVitals?.brpm      ?? fingerVitals?.brpm   ?? null;
 
+  // Include user's phone for family-linking (read from profile in localStorage)
+  let userPhone = null;
+  try {
+    const p = JSON.parse(localStorage.getItem('somatic.profile') || '{}');
+    userPhone = p.phone || null;
+  } catch {}
+
   const payload = {
     mode: 'dual',
     deviceType: DEVICE,
     durationSec: PHASE_SECONDS * 2,
+    phone: userPhone,
     fused: {
       bpm:    fusedBpm,
       hrv_ms: fusedHrv  != null ? Math.round(fusedHrv)  : null,
